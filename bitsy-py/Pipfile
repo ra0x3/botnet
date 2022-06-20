@@ -1,0 +1,19 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+httpx = "*"
+web3 = "*"
+ariadne = "*"
+
+[dev-packages]
+black = "*"
+pylint = "*"
+mypy = "*"
+pytest = "*"
+pytest-asyncio = "*"
+
+[requires]
+python_version = "3.9"
