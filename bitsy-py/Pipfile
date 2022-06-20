@@ -7,6 +7,9 @@ name = "pypi"
 httpx = "*"
 web3 = "*"
 ariadne = "*"
+pyyaml = "*"
+blake3 = "*"
+cryptography = "*"
 
 [dev-packages]
 black = "*"

@@ -63,3 +63,5 @@ buck-out/
 
 # bitsy-py
 **/venv
+*.db
+**/__pycache__
