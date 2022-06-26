@@ -1,0 +1,27 @@
+language: python
+python:
+  - "3.9"
+
+
+before_install:
+  - cd requirements/
+  - pip install pipenv
+
+install:
+  - pipenv install
+  - pipenv sync --dev
+
+jobs:
+  include:
+    - stage: Black Format
+      script: format
+    
+    - stage: PyLint
+      script: lint
+
+    - stage: Typing
+      script: mypy
+
+    - stage: Test
+      script: test
+  

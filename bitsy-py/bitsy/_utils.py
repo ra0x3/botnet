@@ -1,5 +1,3 @@
-import re
-import enum
 import sqlite3
 import pathlib
 import os
@@ -10,47 +8,41 @@ from ._t import *
 
 
 def create_test_db(path: str) -> sqlite3.Connection:
-    conn = sqlite3.connect(path)
+    conn = sqlite3.connect(path, check_same_thread=False)
     os.chmod(path, 0o777)
     return conn
 
 
-def remove_test_db(path: str):
-    path = pathlib.Path(path)
-    if path.exists():
-        path.unlink()
+def remove_file(paths: List[str]):
+    for p in paths:
+        path = pathlib.Path(p)
+        if path.exists():
+            try:
+                path.unlink()
+            except PermissionError as err:
+                print(str(err))
 
 
-def blake(input: str) -> str:
-    return blake3(input.encode()).digest()
+def blake3_sha256(input: str) -> str:
+    digest: str = blake3(input.encode()).hexdigest()
+    return digest
 
 
 def uuid4() -> str:
     return str(uuid.uuid4())
 
 
-class ValueType(enum.Enum):
-    Int = "int"
-    Float = "float"
-    String = "str"
-    Bool = "bool"
-
-
-def is_of_type(value: Any, ty: ValueType) -> bool:
-    if ty == ValueType.Int:
-        return isinstance(value, int)
-
-    if ty == ValueType.Float:
-        return isinstance(value, float)
-
-    if ty == ValueType.String:
-        return isinstance(value, str)
-
-    if ty == ValueType.Bool:
-        return isinstance(value, bool)
-
-    raise NotImplementedError
-
-
 def quote(s: str) -> str:
     return f"'{s}'"
+
+
+def decode_utf8(s: bytes) -> str:
+    return s.decode()
+
+
+def encode_utf8(s: str) -> bytes:
+    return s.encode()
+
+
+def remove_empty_keys(d: Dict[str, Any]) -> Dict[str, Any]:
+    return {key: value for key, value in d.items() if value}

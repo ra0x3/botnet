@@ -1,0 +1,19 @@
+# hello
+curl -X POST http://127.0.0.1:8000/graphql -d '{"query": "query { hello }"}' -H "Content-type: application/json" | json_pp
+
+# access_token
+curl -X POST http://127.0.0.1:8000/graphql -d '{"query": "query { access_token(uuid: \"9e1a0229-e6cd-4933-a1c9-188cad336d7d\") { uuid } }"}' -H "Content-type: application/json" | json_pp
+
+# third party
+curl -X POST http://127.0.0.1:8000/graphql -d '{"query": "query { third_party(uuid: \"60f15444-47ad-483d-9ff3-de36e27fafa8\") { uuid access_token { uuid } } }"}' -H "Content-type: application/json" | json_pp
+curl -X POST http://127.0.0.1:8000/graphql -d '{"query": "query { third_party(uuid: \"60f15444-47ad-483d-9ff3-de36e27fafa8\", access_token: \"577ef7ee-5bb3-4eac-a2c8-6de2760a6950\" ) { uuid access_token { uuid } } }"}' -H "Content-type: application/json" | json_pp
+
+# pubkey
+curl -X POST http://127.0.0.1:8000/graphql -d '{"query": "query { account(pubkey: \"123\") { pubkey }}"}' -H "Content-type: application/json" | json_pp
+
+# permission
+curl -X POST http://127.0.0.1:8000/graphql -d '{"query": "query { permission(uuid: \"ea7f5381-85b4-4dad-93a8-19f30d44eb39\") { uuid key document { cid blob } value account { pubkey } }}"}' -H "Content-type: application/json" | json_pp
+curl -X POST http://127.0.0.1:8000/graphql -d '{"query": "query { permission(value: 1) { uuid key document { cid blob } value account { pubkey } }}"}' -H "Content-type: application/json" | json_pp
+
+# document
+curl -X POST http://127.0.0.1:8000/graphql -d '{"query": "query { document(cid: \"8cfeb8fcf70155b87cf65b415e0cff97c69f8caf00e956447bef7b21256e7ca5\") { cid blob { data } account { pubkey } }}"}' -H "Content-type: application/json" | json_pp

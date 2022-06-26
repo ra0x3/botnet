@@ -1,2 +1,3 @@
 bootstrap_db: true
 db_path: test.db
+keystore_provider: in-memory

@@ -6,10 +6,14 @@ name = "pypi"
 [packages]
 httpx = "*"
 web3 = "*"
-ariadne = "*"
 pyyaml = "*"
 blake3 = "*"
+fastapi = "*"
 cryptography = "*"
+strawberry-graphql = "*"
+uvicorn = "*"
+python-dotenv = "*"
+hvac = "*"
 
 [dev-packages]
 black = "*"
@@ -20,3 +24,6 @@ pytest-asyncio = "*"
 
 [requires]
 python_version = "3.9"
+
+[pipenv]
+allow_prereleases = true

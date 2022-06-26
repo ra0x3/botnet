@@ -1,7 +1,3 @@
-import os
-import sys
-import enum
-import abc
 import sqlite3
 
 from ._t import *
@@ -14,8 +10,8 @@ class Database:
     def __init__(self, config: BitsyConfig):
         self.config = config
         self._conn: Optional[sqlite3.Connection] = None
-        self._tables: List[Table] = []
-        self._tables_map: Dict[str, Table] = {}
+        self._models: List[Model] = []
+        self._models_map: Dict[str, Model] = {}
         self._init()
 
     def _init(self):
@@ -23,24 +19,19 @@ class Database:
         if self.config.bootstrap_db:
             self._bootstrap()
 
-    def commit(self):
-        self._conn.commit()
-
-    def query(self, stmnt: str) -> Any:
-        results = self._conn.execute(stmnt)
-        return results
-
     def _bootstrap(self):
         tables = [
-            Model.AccessToken.value,
-            Model.ThirdParty.value,
-            Model.Permission.value,
-            Model.Account.value,
-            Model.Document.value,
+            AccessToken,
+            ThirdParty,
+            Permission,
+            Account,
+            Document,
         ]
 
-        self._tables = tables
-        self._tables_map = dict([(table.name, table) for table in self._tables])
+        self._models = tables
+        self._models_map = dict(
+            [(model.table.name, model) for model in self._models]
+        )
 
-        for table in self._tables:
+        for table in self._models:
             table.create()

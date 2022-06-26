@@ -7,7 +7,10 @@ from bitsy._utils import *
 class TestIndex:
     def test_index_create_fragment_returns_proper_fragment(self):
         index = Index("bar", unique=True, table_name="foo", column_name="baz")
-        assert (index.create_fragment() == "CREATE UNIQUE INDEX IF NOT EXISTS bar ON foo(baz)")
+        assert (
+            index.create_fragment()
+            == "CREATE UNIQUE INDEX IF NOT EXISTS bar ON foo(baz)"
+        )
 
 
 class TestColumn:
@@ -31,7 +34,10 @@ class TestColumn:
                 "foo", reference=ForeignKeyReference("bar", "id")
             ),
         )
-        assert (column.create_fragment() == "  foo Integer,\n  FOREIGN KEY(foo) REFERENCES bar(id) ON DELETE NO ACTION,\n")
+        assert (
+            column.create_fragment()
+            == "  foo Integer,\n  FOREIGN KEY(foo) REFERENCES bar(id) ON DELETE NO ACTION,\n"
+        )
 
 
 class TestTable:
@@ -55,11 +61,14 @@ class TestTable:
         )
 
         stmnt = table._create_stmnt()
-        assert stmnt == """CREATE TABLE IF NOT EXISTS foo (
+        assert (
+            stmnt
+            == """CREATE TABLE IF NOT EXISTS foo (
   id Integer PRIMARY KEY AUTOINCREMENT,
   uuid Text,
   bytes Blob
 );"""
+        )
 
         table.create()
 
@@ -116,7 +125,7 @@ class TestTable:
         table.create()
 
     def teardown_method(self):
-        remove_test_db("test_db.db")
+        remove_file(["test_db.db"])
 
 
 class TestDabase:

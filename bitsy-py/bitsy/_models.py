@@ -1,13 +1,11 @@
 import abc
 import enum
-import time
-import web3
-import json
-import sys
 
 from ._t import *
 from ._utils import *
 from ._config import BitsyConfig
+
+SQL_NULL = "null"
 
 
 class table_name(enum.Enum):
@@ -16,10 +14,18 @@ class table_name(enum.Enum):
     permissions = "permissions"
     accounts = "accounts"
     documents = "documents"
+    settings = "settings"
+
+
+class SettingKey(enum.Enum):
+    Other = "other"
 
 
 class PermKey(enum.Enum):
-    Other = "other.misc_other"
+    Other = "other"
+    Read = "read"
+    Write = "write"
+    Delete = "delete"
 
 
 class ColumnType(enum.Enum):
@@ -97,7 +103,6 @@ class Column:
         self.unique = unique
         self.foreign_key = foreign_key
         self.default = default
-        self._last: bool = False
 
     def create_fragment(self) -> str:
         frag = f"  {self.name} {self.type.name}"
@@ -122,22 +127,12 @@ class Column:
         if self.default:
             frag += f" DEFAULT {self.default}"
 
-        if not self.last or self.foreign_key:
-            frag += ",\n"
+        frag += ",\n"
 
         if self.foreign_key:
-            frag += self.foreign_key.create_fragment()
-            if not self.last:
-                frag += ",\n"
+            frag = frag + self.foreign_key.create_fragment() + ",\n"
 
         return frag
-
-    @property
-    def last(self) -> bool:
-        return self._last
-
-    def set_last(self):
-        self._last = True
 
 
 class Table:
@@ -149,14 +144,16 @@ class Table:
     ):
         self.name = name
         self.columns = columns
-        self.columns[-1].set_last()
         self.conn = conn
 
     def _create_stmnt(self) -> str:
         types = "".join([column.create_fragment() for column in self.columns])
-        stmnt = f"CREATE TABLE IF NOT EXISTS {self.name} (\n{types}\n);"
+        stmnt = f"CREATE TABLE IF NOT EXISTS {self.name} (\n{types});"
         stmnt = self.reorganize_foreign_keys(stmnt)
 
+        # Remove final trailing comma
+        idx = stmnt.rfind(",")
+        stmnt = stmnt[:idx] + stmnt[idx + 1 :]
         return stmnt
 
     def create(self):
@@ -196,54 +193,115 @@ class Table:
         return "\n".join(column_frags)
 
 
-#########
-
-
 class DocumentBlob:
-    def __init__(self, data: bytes):
+    def __init__(self, data: str):
         self.data = data
+
+    # FIXME: wtf is this shit?
+    def decode(self) -> str:
+        if isinstance(self.data, bytes):
+            return decode_utf8(self.data)
+        return self.data
 
 
 class Wallet:
-    def __init__(self):
-        pass
-
-    def _load_private_key(self, path: str, password: str):
-        with open(path) as keyfile:
-            encrypted_key = keyfile.read()
-            private_key = web3.eth.account.decrypt(encrypted_key, password)
+    pass
 
 
-################
-
-
-class BaseModel:
-    table: Table
+class ModelEntry:
+    @abc.abstractmethod
+    def to_row(self) -> Tuple[Any]:
+        raise NotImplementedError
 
     @abc.abstractstaticmethod
     def from_row(row: Tuple[Any]):
         raise NotImplementedError
 
-    def to_row(self) -> Tuple[Any]:
-        values = []
-        for value in self.__dict__.values():
-            if is_of_type(value, ValueType.String):
-                value = quote(value)
-            values.append(value)
-        return tuple(values)
+
+class BaseModel(ModelEntry):
+    table: Table
 
     def save(self):
         columns_frag = ", ".join([column.name for column in self.table.columns])
         values_frag = ", ".join(self.to_row())
         stmnt = f"INSERT INTO {self.table.name} ({columns_frag}) VALUES ({values_frag});"
+        # print(">>> STMTT ", stmnt)
+
         cursor = self.table.conn.cursor()
         cursor.execute(stmnt)
         self.table.conn.commit()
 
-    def get(self, clause: Dict[str, Any]):
-        stmnt = f"SELECT * FROM {self.name} WHER"
-        for key, item in clause.items():
-            pass
+    @classmethod
+    def all(cls) -> List["BaseModel"]:
+        stmnt = f"SELECT * FROM {cls.table.name};"
+        cursor = cls.table.conn.cursor()
+        cursor.execute(stmnt)
+        results = cursor.fetchall()
+        return [cls.from_row(result) for result in results]
+
+    @classmethod
+    def update(cls, update: Dict[str, Any], where: Dict[str, Any]) -> Any:
+        parts = []
+        for key, item in update.items():
+            if isinstance(item, str):
+                item = quote(item)
+            parts.append(f"{key} = {item}")
+        update_frag = ", ".join(parts)
+
+        stmnt = f"UPDATE {cls.table.name} SET {update_frag}"
+
+        if where:
+            stmnt += " WHERE "
+            parts = []
+            for key, item in where.items():
+                if isinstance(item, str):
+                    item = quote(item)
+                parts.append(f"{key} = {item}")
+            stmnt += " AND ".join(parts)
+
+        stmnt += " RETURNING *;"
+
+        cursor = cls.table.conn.cursor()
+        cursor.execute(stmnt)
+        result = cursor.fetchone()
+
+        cls.table.conn.commit()
+
+        return cls.from_row(result)
+
+    @classmethod
+    def get(cls, where: Dict[str, Any]) -> Any:
+        stmnt = f"SELECT * FROM {cls.table.name} WHERE "
+        parts = []
+        for key, item in where.items():
+            if isinstance(item, str):
+                item = quote(item)
+            parts.append(f"{key} = {item}")
+
+        stmnt = stmnt + " AND ".join(parts) + ";"
+
+        cursor = cls.table.conn.cursor()
+        cursor.execute(stmnt)
+
+        result = cursor.fetchone()
+        return cls.from_row(result)
+
+    @classmethod
+    def get_many(cls, where: Dict[str, Any]) -> List[Any]:
+        stmnt = f"SELECT * FROM {cls.table.name} WHERE "
+        parts = []
+        for key, item in where.items():
+            if isinstance(item, str):
+                item = quote(item)
+            parts.append(f"{key} = {item}")
+
+        stmnt = stmnt + " AND ".join(parts) + ";"
+
+        cursor = cls.table.conn.cursor()
+        cursor.execute(stmnt)
+
+        results = cursor.fetchall()
+        return [cls.from_row(result) for result in results]
 
 
 class AccessToken(BaseModel):
@@ -263,17 +321,14 @@ class AccessToken(BaseModel):
         return AccessToken(key)
 
     def to_row(self) -> Tuple[Any]:
-        values = []
-        for value in self.__dict__.values():
-            if is_of_type(value, ValueType.String):
-                value = quote(value)
-
-            values.append(value)
-        return tuple(values)
+        return (quote(self.uuid),)
 
     @staticmethod
     def create():
         AccessToken.table.create()
+
+    def is_null(self) -> bool:
+        return self.uuid == SQL_NULL
 
 
 class ThirdParty(BaseModel):
@@ -293,14 +348,22 @@ class ThirdParty(BaseModel):
         conn=BitsyConfig.conn,
     )
 
-    def __init__(self, uuid: str, access_token: str):
+    def __init__(self, uuid: str, access_token: Optional[AccessToken] = None):
         self.uuid = uuid
         self.access_token = access_token
 
+    def to_row(self) -> Tuple[Any]:
+        if self.access_token:
+            return (quote(self.uuid), quote(self.access_token.uuid))
+        return (quote(self.uuid), SQL_NULL)
+
     def from_row(row: Tuple[Any]) -> "ThirdParty":
-        (uuid, access_token) = row
-        token = AccessToken.from_row((access_token,))
-        return ThirdParty(uuid, token)
+        row = tuple([item for item in row if item])
+        if len(row) == 2:
+            (uuid, access_token) = row
+            return ThirdParty(uuid, AccessToken(access_token))
+        (uuid,) = row
+        return ThirdParty(uuid)
 
     def table_name(self) -> str:
         return table_name.third_parties.value
@@ -320,13 +383,21 @@ class Permission(BaseModel):
         columns=[
             Column("uuid", ColumnType.Text, unique=True),
             Column("key", ColumnType.Text),
+            Column(
+                "document_id",
+                ColumnType.Text,
+                foreign_key=ForeignKey(
+                    "document_id",
+                    reference=ForeignKeyReference("documents", "id"),
+                ),
+            ),
             Column("value", ColumnType.Integer, default=0),
             Column(
-                "account_address",
-                ColumnType.Integer,
+                "account_pubkey",
+                ColumnType.Text,
                 foreign_key=ForeignKey(
-                    "account_address",
-                    reference=ForeignKeyReference("accounts", "address"),
+                    "account_pubkey",
+                    reference=ForeignKeyReference("accounts", "pubkey"),
                 ),
             ),
             Column(
@@ -337,6 +408,7 @@ class Permission(BaseModel):
                     reference=ForeignKeyReference("third_parties", "uuid"),
                 ),
             ),
+            Column("ttl", ColumnType.Integer, default=-1),
         ],
         conn=BitsyConfig.conn,
     )
@@ -344,20 +416,54 @@ class Permission(BaseModel):
     def __init__(
         self,
         uuid: str,
-        key: str,
+        key: PermKey,
+        document: "Document",
         value: int,
-        account_id: str,
-        third_party_id: str,
+        account: "Account",
+        third_party: ThirdParty,
+        ttl: int,
     ):
         self.uuid = uuid
         self.key = key
+        self.document = document
         self.value = value
-        self.account_id = account_id
-        self.third_party_id = third_party_id
+        self.account = account
+        self.third_party = third_party
+        self.ttl = ttl
+
+    def to_row(self) -> Tuple[Any]:
+        return (
+            quote(self.uuid),
+            quote(self.key.value),
+            quote(self.document.cid),
+            str(self.value),
+            quote(self.account.pubkey),
+            quote(self.third_party.uuid),
+            str(self.ttl),
+        )
 
     def from_row(row: Tuple[Any]) -> "Permission":
-        (uuid, key, value, account_id, third_party_id) = row
-        return Permission(uuid, key, value, account_id, third_party_id)
+        (
+            uuid,
+            key,
+            document_id,
+            value,
+            pubkey,
+            third_party_id,
+            ttl,
+        ) = row
+        document = Document.get({"cid": document_id})
+        account = Account.get({"pubkey": pubkey})
+        party = ThirdParty.get({"uuid": third_party_id})
+        return Permission(
+            uuid,
+            PermKey(key),
+            document,
+            value,
+            account,
+            party,
+            ttl,
+        )
 
     @staticmethod
     def create():
@@ -367,16 +473,19 @@ class Permission(BaseModel):
 class Account(BaseModel):
     table = Table(
         table_name.accounts.value,
-        columns=[Column("address", ColumnType.Text, unique=True)],
+        columns=[Column("pubkey", ColumnType.Text, unique=True)],
         conn=BitsyConfig.conn,
     )
 
-    def __init__(self, address: str):
-        self.address = address
+    def __init__(self, pubkey: str):
+        self.pubkey = pubkey
+
+    def to_row(self) -> Tuple[Any]:
+        return (quote(self.pubkey),)
 
     def from_row(row: Tuple[Any]) -> "Account":
-        (address,) = row
-        return Account(address)
+        (pubkey,) = row
+        return Account(pubkey)
 
     @staticmethod
     def create():
@@ -388,36 +497,74 @@ class Document(BaseModel):
         table_name.documents.value,
         columns=[
             Column("cid", ColumnType.Text, unique=True),
-            Column("metadata", ColumnType.Text),
+            Column("blob", ColumnType.Blob),
             Column(
-                "account_address",
+                "account_pubkey",
                 ColumnType.Integer,
                 foreign_key=ForeignKey(
-                    "account_address",
-                    reference=ForeignKeyReference("accounts", "address"),
+                    "account_pubkey",
+                    reference=ForeignKeyReference("accounts", "pubkey"),
                 ),
             ),
         ],
         conn=BitsyConfig.conn,
     )
 
-    def __init__(self, cid: str, blob: bytes, account_id: str):
+    def __init__(self, cid: str, blob: DocumentBlob, account: Account):
         self.cid = cid
-        self.blob = DocumentBlob(blob)
-        self.account_id = account_id
+        self.blob = blob
+        self.account = account
+
+    def to_row(self) -> Tuple[Any]:
+        return (
+            quote(self.cid),
+            quote(self.blob.decode()),
+            quote(self.account.pubkey),
+        )
 
     def from_row(row: Tuple[Any]) -> "Document":
-        (cid, blob, account_id) = row
-        return Document(cid, blob, account_id)
+        (cid, blob, pubkey) = row
+        return Document(cid, DocumentBlob(blob), Account(pubkey))
 
     @staticmethod
     def create():
         Document.table.create()
 
 
-class Model(enum.Enum):
+class Setting(BaseModel):
+    table = Table(
+        table_name.settings.value,
+        columns=[
+            Column(
+                "id", ColumnType.Integer, auto_increment=True, primary_key=True
+            ),
+            Column("key", ColumnType.Text),
+            Column("value", ColumnType.Integer),
+        ],
+        conn=BitsyConfig.conn,
+    )
+
+    def __init__(self, id: int, key: SettingKey, value: int):
+        self.id = id
+        self.key = key
+        self.value = value
+
+    def to_row(self) -> Tuple[Any]:
+        return (self.id, quote(self.key.value), quote(self.value))
+
+    def from_row(row: Tuple[Any]) -> "Setting":
+        (id, key, value) = row
+        return Setting(id, SettingKey(key), value)
+
+    @staticmethod
+    def create():
+        Setting.table.create()
+
+
+class Model:
     AccessToken = AccessToken
     ThirdParty = ThirdParty
     Permission = Permission
     Account = Account
     Document = Document
+    Setting = Setting
