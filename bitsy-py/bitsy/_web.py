@@ -103,7 +103,8 @@ async def route_new_access_token_for_third_party(request: Request):
 @app.post("/account")
 async def route_create_account(request: Request):
     body = await request.json()
-    account: Account = create_account(body["pubkey"])
+    pubkey = mnemnonic_to_pubkey(body["mnemnonic"])
+    account: Account = create_account(pubkey)
     return account
 
 

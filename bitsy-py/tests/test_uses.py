@@ -1,9 +1,8 @@
-import pytest
-
 from bitsy._t import *
 from bitsy._uses import *
 from bitsy._utils import *
 from bitsy._models import *
+from bitsy._crypto import *
 
 from .conftest import *
 
@@ -39,8 +38,9 @@ class TestUsesCases(BaseTestClass):
         assert not get_party.access_token
         assert get_party.uuid == party.uuid
 
-    def test_can_create_store_get_account(self, pubkey):
-        account = create_account(pubkey)
+    def test_can_create_store_get_account(self, keypair):
+        keys = keypair
+        account = create_account(keys.pubkey)
         assert isinstance(account, Account)
 
         result = self.get_from_db(
@@ -51,8 +51,11 @@ class TestUsesCases(BaseTestClass):
         get_account = Account.from_row(result[0])
         assert account.pubkey == get_account.pubkey
 
-    def test_can_create_store_get_document(self, pubkey):
-        account = create_account(pubkey)
+        response = KeyStore.get(account.pubkey)
+        assert response == keys.pubkey.to_hex()
+
+    def test_can_create_store_get_document(self, keypair):
+        account = create_account(keypair.pubkey)
         doc = create_document_for_account("hello world", account)
         assert isinstance(doc, Document)
 
@@ -65,8 +68,8 @@ class TestUsesCases(BaseTestClass):
         assert doc.cid == get_doc.cid
         assert doc.blob.data == get_doc.blob.data
 
-    def test_grant_perms_on_new_doc_for_third_party(self, pubkey):
-        account = create_account(pubkey)
+    def test_grant_perms_on_new_doc_for_third_party(self, keypair):
+        account = create_account(keypair.pubkey)
         party = create_third_party()
         _ = create_access_token_for_third_party(party)
         perm = grant_perms_on_new_doc_for_third_party(
@@ -82,8 +85,8 @@ class TestUsesCases(BaseTestClass):
         assert perm.uuid == get_perm.uuid
         assert perm.document.blob.data == get_perm.document.blob.data
 
-    def test_grant_perms_on_existing_doc_for_third_party(self, pubkey):
-        account = create_account(pubkey)
+    def test_grant_perms_on_existing_doc_for_third_party(self, keypair):
+        account = create_account(keypair.pubkey)
         doc = create_document_for_account("hello world", account)
         party = create_third_party()
         _ = create_access_token_for_third_party(party)
@@ -117,8 +120,8 @@ class TestUsesCases(BaseTestClass):
 
         assert len(result) == 1
 
-    def test_revoke_third_party_perms_on_account(self, pubkey):
-        account = create_account(pubkey)
+    def test_revoke_third_party_perms_on_account(self, keypair):
+        account = create_account(keypair.pubkey)
         party = create_third_party()
         _ = create_access_token_for_third_party(party)
         perm = grant_perms_on_new_doc_for_third_party(
@@ -132,10 +135,10 @@ class TestUsesCases(BaseTestClass):
         assert updated_perm.value == 0
         assert updated_perm.value != perm.value
 
-    def test_list_all_third_party_perms_for_account(self, pubkey):
+    def test_list_all_third_party_perms_for_account(self, keypair):
         n = 3
 
-        account = create_account(pubkey)
+        account = create_account(keypair.pubkey)
 
         for _ in range(n):
             party = create_third_party()

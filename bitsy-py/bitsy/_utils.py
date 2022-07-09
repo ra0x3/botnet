@@ -46,3 +46,7 @@ def encode_utf8(s: str) -> bytes:
 
 def remove_empty_keys(d: Dict[str, Any]) -> Dict[str, Any]:
     return {key: value for key, value in d.items() if value}
+
+
+def env_var(key: str) -> Any:
+    return os.environ[key]

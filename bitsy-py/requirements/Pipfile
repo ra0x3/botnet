@@ -14,6 +14,7 @@ strawberry-graphql = "*"
 uvicorn = "*"
 python-dotenv = "*"
 hvac = "*"
+eth-tester = "*"
 
 [dev-packages]
 black = "*"

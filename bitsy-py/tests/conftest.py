@@ -2,10 +2,15 @@ import random
 import string
 
 import pytest
+import eth_account
+import eth_keys
 
 from bitsy._utils import *
 from bitsy._t import *
+from bitsy._const import web3
 from bitsy._models import Model
+from bitsy._crypto import Keypair
+
 from .utils import *
 
 
@@ -58,3 +63,20 @@ def xml_doc() -> str:
 @pytest.fixture
 def pubkey(n: int = 36) -> str:
     return "".join([random.choice(chars) for _ in range(n)])
+
+
+@pytest.fixture
+def eth_acct() -> eth_account.Account:
+    return web3.eth.account.create()
+
+
+@pytest.fixture
+def keypair() -> Keypair:
+    acct = web3.eth.account.create()
+    privkey = eth_keys.keys.PrivateKey(acct._private_key)
+    return Keypair(privkey, privkey.public_key)
+
+
+@pytest.fixture
+def mnemnonic() -> str:
+    return RealMetamaskAcct.mnemnonic

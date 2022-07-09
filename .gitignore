@@ -67,3 +67,5 @@ buck-out/
 **/__pycache__
 **/.pytest_cache
 **/.mypy_cache
+.env.prod
+.env.dev

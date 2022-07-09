@@ -1,3 +1,5 @@
+import eth_keys
+
 from ._t import *
 from ._db import *
 from ._models import *
@@ -43,10 +45,18 @@ def create_access_token_for_third_party(party: ThirdParty) -> AccessToken:
 
 
 @use_case
-def create_account(pubkey: str) -> Account:
-    account = Account(blake3_sha256(pubkey))
+def create_account(pubkey: PublicKey) -> Account:
+    account = Account(blake3_sha256(pubkey.to_hex()))
     account.save()
+    _ = KeyStore.put(pubkey)
     return account
+
+
+@use_case
+def update_account_keys(
+    prev_account_pubkey: str, new_account_pubkey: str
+) -> Account:
+    raise NotImplementedError
 
 
 @use_case
@@ -163,10 +173,16 @@ def list_all_third_party_perms_for_account(
 
 @use_case
 def toggle_setting_for_account(account: Account) -> Setting:
-    pass
+    raise NotImplementedError
 
 
 @use_case
 def register_new_account(privkey: PublicKey) -> Account:
     account = create_account()
-    pass
+    raise NotImplementedError
+
+
+@use_case
+def from_mnemnonic(mnemnonic: str) -> str:
+    acct = eth_account_from_mnemnonic(mnemnonic)
+    return pubkey_to_privkey(acct.address)
