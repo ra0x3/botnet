@@ -8,3 +8,15 @@ class InvalidPermissionError(_BitsyError):
 
 class InvalidSettingError(_BitsyError):
     pass
+
+
+class WebError(_BitsyError):
+    pass
+
+
+class DatabaseError(_BitsyError):
+    pass
+
+
+class VaultError(_BitsyError):
+    pass

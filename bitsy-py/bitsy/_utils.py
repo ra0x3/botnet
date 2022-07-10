@@ -13,6 +13,7 @@ from ._t import *
 
 def create_test_db(path: str) -> sqlite3.Connection:
     conn = sqlite3.connect(path, check_same_thread=False)
+    # curr = conn.execute("PRAGMA locking_mode = EXCLUSIVE")
     os.chmod(path, 0o777)
     return conn
 

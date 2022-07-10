@@ -1,4 +1,4 @@
-import eth_keys
+import logging
 
 from ._t import *
 from ._db import *
@@ -7,8 +7,12 @@ from ._crypto import *
 from ._utils import *
 from ._errors import *
 
+logger = logging.getLogger("bitsy.uses")
+
 
 def use_case(func):
+    logger.debug(func.__name__)
+
     def _use_case(*args, **kwargs):
         result = func(*args, **kwargs)
         return result
@@ -106,7 +110,11 @@ def third_party_access_document_id(
         }
     )
     if not setting:
-        return None
+        raise InvalidSettingError(
+            "Account({}) does not have Setting({}) configured.".format(
+                account_pubkey, SettingKey.BitsyVaultDeletegation
+            )
+        )
 
     document = perm.document
 

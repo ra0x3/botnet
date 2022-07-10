@@ -1,7 +1,8 @@
-import pathlib
 from bitsy._db import *
 from bitsy._models import *
 from bitsy._utils import *
+
+db_path = "test_db.db"
 
 
 class TestIndex:
@@ -124,10 +125,10 @@ class TestTable:
 
         table.create()
 
-    def teardown_method(self):
-        remove_file(["test_db.db"])
-
 
 class TestDabase:
     def test_foo(self):
         assert 1 == 2 - 1
+
+
+remove_file([db_path])

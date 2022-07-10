@@ -1,8 +1,7 @@
-from pydoc import doc
 from fastapi.testclient import TestClient
 from fastapi import status
 
-from bitsy import app
+from bitsy import _app
 from bitsy._const import *
 from bitsy._models import *
 from bitsy._uses import *
@@ -14,7 +13,7 @@ db_path = "test_web.db"
 
 class TestWeb(BaseTestClass):
     def setup_method(self):
-        self.client = TestClient(app)
+        self.client = TestClient(_app)
         self.db_path = db_path
         self.conn = self.setup_method_models(self.db_path)
 
@@ -64,7 +63,7 @@ class TestWeb(BaseTestClass):
     def test_route_new_access_token_for_third_party(self):
         party = create_third_party()
 
-        response = self.client.post("/access_token", json={"uuid": party.uuid})
+        response = self.client.post("/access-token", json={"uuid": party.uuid})
         rjson = response.json()
 
         token = AccessToken.from_row((rjson["uuid"],))

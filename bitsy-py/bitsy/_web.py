@@ -92,7 +92,7 @@ async def route_create_document(request: Request):
     return doc
 
 
-@app.post("/access_token")
+@app.post("/access-token")
 async def route_new_access_token_for_third_party(request: Request):
     body = await request.json()
     third_party_id = body["uuid"]

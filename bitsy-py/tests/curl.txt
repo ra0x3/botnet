@@ -1,3 +1,8 @@
+##############################
+# GRAPHQL QUERIES
+###############################
+
+
 # hello
 curl -X POST http://127.0.0.1:8000/graphql -d '{"query": "query { hello }"}' -H "Content-type: application/json" | json_pp
 
@@ -17,3 +22,14 @@ curl -X POST http://127.0.0.1:8000/graphql -d '{"query": "query { permission(val
 
 # document
 curl -X POST http://127.0.0.1:8000/graphql -d '{"query": "query { document(cid: \"8cfeb8fcf70155b87cf65b415e0cff97c69f8caf00e956447bef7b21256e7ca5\") { cid blob { data } account { pubkey } }}"}' -H "Content-type: application/json" | json_pp
+
+
+##############################
+# USE CASES
+###############################
+
+# third party
+curl -X POST http://127.0.0.1:8000/third-party
+
+# access token
+curl -X POST http://127.0.0.1:8000/access-token
