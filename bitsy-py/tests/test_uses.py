@@ -51,12 +51,25 @@ class TestUsesCases(BaseTestClass):
         get_account = Account.from_row(result[0])
         assert account.pubkey == get_account.pubkey
 
-        response = KeyStore.get(account.pubkey)
+        response = KeyStore.get_key(account.pubkey)
         assert response == keys.pubkey.to_hex()
 
-    def test_can_create_store_get_document(self, keypair):
+        result = self.get_from_db(
+            f"SELECT * FROM settings WHERE key = '{SettingKey.BitsyVaultDeletegation.value}' AND account_pubkey = '{account.pubkey}';"
+        )
+        assert len(result) == 1
+        get_setting = Setting.from_row(result[0])
+
+        result = self.get_from_db(
+            f"SELECT * FROM access_tokens WHERE uuid = '{get_setting.access_token.uuid}';"
+        )
+        assert len(result) == 1
+
+        get_account = AccessToken.from_row(result[0])
+
+    def test_can_create_store_get_document(self, xml_doc, keypair):
         account = create_account(keypair.pubkey)
-        doc = create_document_for_account("hello world", account)
+        doc = create_document_for_account(xml_doc, account)
         assert isinstance(doc, Document)
 
         result = self.get_from_db(
@@ -67,13 +80,17 @@ class TestUsesCases(BaseTestClass):
         get_doc = Document.from_row(result[0])
         assert doc.cid == get_doc.cid
         assert doc.blob.data == get_doc.blob.data
+        assert doc.key_img is not None
+
+        key = KeyStore.get_bytes(doc.key_img)
+        assert isinstance(key, bytes)
 
     def test_grant_perms_on_new_doc_for_third_party(self, keypair):
         account = create_account(keypair.pubkey)
         party = create_third_party()
         _ = create_access_token_for_third_party(party)
         perm = grant_perms_on_new_doc_for_third_party(
-            PermKey.Other, party, "hello world", account, 12
+            PermissionKey.Other, party, "hello world", account, 12
         )
 
         result = self.get_from_db(
@@ -91,11 +108,11 @@ class TestUsesCases(BaseTestClass):
         party = create_third_party()
         _ = create_access_token_for_third_party(party)
         perm = grant_perms_on_new_doc_for_third_party(
-            PermKey.Other, party, doc.blob.data, account, 12
+            PermissionKey.Other, party, doc.blob.data, account, 12
         )
 
         perm = grant_perms_on_existing_doc_for_third_party(
-            PermKey.Other, party, account, doc
+            PermissionKey.Other, party, account, doc
         )
         assert isinstance(perm, Permission)
 
@@ -125,11 +142,11 @@ class TestUsesCases(BaseTestClass):
         party = create_third_party()
         _ = create_access_token_for_third_party(party)
         perm = grant_perms_on_new_doc_for_third_party(
-            PermKey.Other, party, "hello world", account, 12
+            PermissionKey.Other, party, "hello world", account, 12
         )
 
         updated_perm = revoke_third_party_perms_on_account(
-            PermKey.Other, account, party
+            PermissionKey.Other, account, party
         )
 
         assert updated_perm.value == 0
@@ -145,15 +162,34 @@ class TestUsesCases(BaseTestClass):
             _ = create_access_token_for_third_party(party)
 
             _ = grant_perms_on_new_doc_for_third_party(
-                PermKey.Other, party, "hello world", account, 12
+                PermissionKey.Other, party, "hello world", account, 12
             )
 
         perms = list_all_third_party_perms_for_account(account)
 
         assert len(perms) == n
 
+    @pytest.mark.skip(reason="Not Implemented")
     def test_toggle_setting_for_account(self):
-        pass
+        raise NotImplementedError
+
+    def test_third_party_access_document_id(self, keypair, xml_doc):
+        account = create_account(keypair.pubkey)
+        party = create_third_party()
+        document = create_document_for_account(xml_doc, account)
+        _ = grant_perms_on_existing_doc_for_third_party(
+            PermissionKey.Read, party, account, document
+        )
+        updated_doc = third_party_access_document_id(
+            party.uuid, document.cid, account.pubkey
+        )
+
+        hexkey = KeyStore.get_bytes(updated_doc.key_img)
+        assert isinstance(hexkey, bytes)
+
+        fernet = fernet_from(unhexlify(hexkey))
+        plaintext = fernet.decrypt(encode(updated_doc.blob.data, Encoding.UTF8))
+        assert plaintext == encode(xml_doc, Encoding.UTF8)
 
 
 remove_file([db_path, "test_uses.db-journal"])

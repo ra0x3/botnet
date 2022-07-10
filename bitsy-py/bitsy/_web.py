@@ -3,7 +3,7 @@ from fastapi.routing import APIRoute
 from pydantic import BaseModel
 import strawberry
 
-from ._models import PermKey, SettingKey
+from ._models import PermissionKey, SettingKey
 from ._uses import *
 from ._utils import *
 
@@ -87,7 +87,7 @@ async def route_create_third_party(request: Request):
 async def route_create_document(request: Request):
     body = await request.json()
     doc: Document = create_document_for_account_id(
-        body["pubkey"], encode_utf8(body["data"])
+        body["pubkey"], encode(body["data"], Encoding.UTF8)
     )
     return doc
 
@@ -118,20 +118,36 @@ async def route_grant_perms_on_doc_for_third_party(request: Request):
 
     if doc_id is None:
         perm: Permission = grant_perms_on_new_doc_for_third_party_id(
-            PermKey(body["key"]),
+            PermissionKey(body["key"]),
             body["party_id"],
-            encode_utf8(doc),
+            encode(doc, Encoding.UTF8),
             body["pubkey"],
         )
         return perm
 
     perm: Permission = grant_perms_on_existing_doc_for_third_party_id(
-        PermKey(body["key"]),
+        PermissionKey(body["key"]),
         body["party_id"],
         body["pubkey"],
         body["document_id"],
     )
     return perm
+
+
+@app.post("/third-party-access-doc")
+async def route_third_party_access_document_id(request: Request):
+
+    body = await request.json()
+
+    third_party_id = body["third_party_id"]
+    document_id = body["document_id"]
+    account_pubkey = body["account_pubkey"]
+
+    document = third_party_access_document_id(
+        third_party_id, document_id, account_pubkey
+    )
+
+    return document
 
 
 router = APIRouter(route_class=DummyRoute)

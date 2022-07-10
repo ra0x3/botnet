@@ -1,12 +1,65 @@
 import abc
+import base64
 import eth_account
 import eth_keys
 import hvac
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.fernet import Fernet
 
 from ._const import web3
 from ._config import *
 from ._utils import *
 from ._t import *
+
+
+# FIXME: Obviously this is a no-no
+def key_image(key: Union[str, bytes]) -> str:
+    return blake3_sha256(key)
+
+
+def salt(n: int = 16) -> bytes:
+    return os.urandom(n)
+
+
+class FernetBundle:
+    def __init__(self, key_bytes: bytes, key_img: str, hexkey: str):
+        self.key: Fernet = fernet_from(key_bytes)
+        self.key_bytes = key_bytes
+        self.key_img = key_img
+        self.hexkey = hexkey
+
+
+def fernet_bundle(key_bytes: Optional[bytes] = None) -> FernetBundle:
+    key_bytes = key_bytes or fernet_bytes()
+    hexkey = hexlify(key_bytes)
+    key_img = key_image(hexkey)
+    return FernetBundle(key_bytes, key_img, hexkey)
+
+
+kdf = PBKDF2HMAC(
+    algorithm=hashes.SHA256(), length=32, salt=salt(), iterations=390000
+)
+
+
+def pbkdf2hmac_kdf(key: bytes) -> bytes:
+    return base64.b64encode(kdf.derive(key))
+
+
+def fernet_from(key: bytes) -> Fernet:
+    return Fernet(key)
+
+
+def aes_key(n: int = 32, iv: int = 16) -> algorithms.AES:
+    key = os.urandom(n)
+    iv = os.urandom(iv)
+    cipher = Cipher(algorithms.AES(key), modes.CBC(iv))
+    return cipher
+
+
+def fernet_bytes() -> bytes:
+    return Fernet.generate_key()
 
 
 class PublicKey(eth_keys.keys.PublicKey):
@@ -63,11 +116,19 @@ class BaseConnection:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def get(self, id: str) -> PublicKey:
+    def get_key(self, id: str) -> PublicKey:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def put(self, key: PublicKey):
+    def get_bytes(self, id: str) -> bytes:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def put_key(self, key: PublicKey):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def put_bytes(self, key: bytes):
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -83,13 +144,20 @@ class InMemoryConnection(BaseConnection):
     def _init(self):
         self._store: Dict[str, PublicKey] = {}
 
-    def get(self, id: str) -> PublicKey:
+    def get_key(self, id: str) -> PublicKey:
         return self._store[id]
 
-    def put(self, key: PublicKey):
+    def get_bytes(self, id: str) -> bytes:
+        return self._store[id]
+
+    def put_key(self, key: PublicKey):
         hexkey = key.to_hex()
-        key_image = blake3_sha256(hexkey)
-        self._store[key_image] = hexkey
+        key_img = key_image(hexkey)
+        self._store[key_img] = hexkey
+
+    def put_bytes(self, key: bytes):
+        key_img = key_image(decode(key, Encoding.UTF8))
+        self._store[key_img] = key
 
     def ids(self) -> List[str]:
         return self._store.keys()
@@ -104,15 +172,25 @@ class VaultConnection(BaseConnection):
             url=self.config.vault_address, token=env_var("VAULT_ROOT_TOKEN")
         )
 
-    def get(self, id: str) -> PublicKey:
+    def get_key(self, id: str) -> PublicKey:
         response = self._store.secrets.kv.v2.read_secret(id)
         return response["data"]["data"]["key"]
 
-    def put(self, key: PublicKey):
+    def get_bytes(self, id: str) -> bytes:
+        response = self._store.secrets.kv.v2.read_secret(id)
+        return encode(response["data"]["data"]["key"], Encoding.UTF8)
+
+    def put_key(self, key: PublicKey):
         hexkey = key.to_hex()
-        key_image = blake3_sha256(hexkey)
+        key_img = key_image(hexkey)
         self._store.secrets.kv.v2.create_or_update_secret(
-            key_image, secret={"key": hexkey}
+            key_img, secret={"key": hexkey}
+        )
+
+    def put_bytes(self, key: bytes):
+        key_img = key_image(key)
+        self._store.secrets.kv.v2.create_or_update_secret(
+            key_img, secret={"key": decode(key, Encoding.UTF8)}
         )
 
     def ids(self) -> List[str]:
@@ -142,11 +220,17 @@ class KeyStore_:
         else:
             raise NotImplementedError
 
-    def get(self, id: str) -> PublicKey:
-        return self._store.get(id)
+    def get_key(self, id: str) -> PublicKey:
+        return self._store.get_key(id)
 
-    def put(self, key: PublicKey):
-        self._store.put(key)
+    def get_bytes(self, id: str) -> bytes:
+        return self._store.get_bytes(id)
+
+    def put_key(self, key: PublicKey):
+        self._store.put_key(key)
+
+    def put_bytes(self, key: bytes):
+        self._store.put_bytes(key)
 
 
 KeyStore = KeyStore_(BitsyConfig)

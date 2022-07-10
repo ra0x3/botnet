@@ -16,15 +16,15 @@ class TestKeyStore:
             BitsyConfig(keystore_provider=KeyStoreProvider.InMemory.value)
         )
         pubkey = keypair.pubkey
-        key_image = blake3_sha256(pubkey.to_hex())
-        store.put(pubkey)
-        response = store.get(key_image)
+        keyimg = key_image(pubkey.to_hex())
+        store.put_key(pubkey)
+        response = store.get_key(keyimg)
         assert response == pubkey.to_hex()
 
     def test_vault_key_store_basic_funcs(self, keypair):
         store = KeyStore_(BitsyConfig())
         pubkey = keypair.pubkey
-        key_image = blake3_sha256(pubkey.to_hex())
-        store.put(pubkey)
-        response = store.get(key_image)
+        keyimg = key_image(pubkey.to_hex())
+        store.put_key(pubkey)
+        response = store.get_key(keyimg)
         assert response == pubkey.to_hex()

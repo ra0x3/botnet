@@ -26,6 +26,7 @@ class Database:
             Permission,
             Account,
             Document,
+            Setting,
         ]
 
         self._models = tables

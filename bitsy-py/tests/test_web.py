@@ -43,11 +43,23 @@ class TestWeb(BaseTestClass):
         rjson = response.json()
 
         document = Document.from_row(
-            (rjson["cid"], rjson["blob"]["data"], rjson["account"]["pubkey"])
+            (
+                rjson["cid"],
+                rjson["blob"]["data"],
+                rjson["account"]["pubkey"],
+                rjson["key_img"],
+            )
         )
 
+        hexkey = KeyStore.get_bytes(document.key_img)
+
+        key = fernet_from(unhexlify(hexkey))
+
         assert isinstance(document.cid, str)
-        assert document.blob.data == "Attack at dawn!"
+        assert (
+            key.decrypt(encode(document.blob.data, Encoding.UTF8))
+            == b"Attack at dawn!"
+        )
 
     def test_route_new_access_token_for_third_party(self):
         party = create_third_party()
@@ -77,7 +89,7 @@ class TestWeb(BaseTestClass):
         response = self.client.post(
             "/permission",
             json={
-                "key": PermKey.Read.value,
+                "key": PermissionKey.Read.value,
                 "party_id": party.uuid,
                 "pubkey": account.pubkey,
                 "document_id": document.cid,

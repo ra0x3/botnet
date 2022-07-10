@@ -5,6 +5,7 @@ from ._db import *
 from ._models import *
 from ._crypto import *
 from ._utils import *
+from ._errors import *
 
 
 def use_case(func):
@@ -46,9 +47,10 @@ def create_access_token_for_third_party(party: ThirdParty) -> AccessToken:
 
 @use_case
 def create_account(pubkey: PublicKey) -> Account:
-    account = Account(blake3_sha256(pubkey.to_hex()))
+    account = Account(key_image(pubkey.to_hex()))
     account.save()
-    _ = KeyStore.put(pubkey)
+    account.create_settings()
+    _ = KeyStore.put_key(pubkey)
     return account
 
 
@@ -62,8 +64,13 @@ def update_account_keys(
 @use_case
 def create_document_for_account(data: str, account: Account) -> Document:
     cid = blake3_sha256(uuid4())
-    document = Document(cid, DocumentBlob(data), account)
+    bundle = fernet_bundle()
+    ciphertext = decode(
+        bundle.key.encrypt(encode(data, Encoding.UTF8)), Encoding.UTF8
+    )
+    document = Document(cid, DocumentBlob(ciphertext), account, bundle.key_img)
     document.save()
+    _ = KeyStore.put_bytes(bundle.hexkey)
     return document
 
 
@@ -73,8 +80,63 @@ def create_document_for_account_id(account_pubkey: str, data: str) -> Document:
 
 
 @use_case
+def third_party_access_document_id(
+    third_party_id: str, document_id: str, account_pubkey: str
+) -> Optional[Document]:
+    perm = Permission.get(
+        where={
+            "document_id": document_id,
+            "third_party_id": third_party_id,
+            "value": 1,
+        }
+    )
+
+    if not perm:
+        raise InvalidPermissionError(
+            "Party({}) does not have Permission({}) for Document({})".format(
+                third_party_id, PermissionKey.Read, document_id
+            )
+        )
+
+    setting = Setting.get(
+        where={
+            "account_pubkey": account_pubkey,
+            "key": SettingKey.BitsyVaultDeletegation.value,
+            "value": 1,
+        }
+    )
+    if not setting:
+        return None
+
+    document = perm.document
+
+    hexkey = KeyStore.get_bytes(document.key_img)
+    bundle = fernet_bundle(unhexlify(hexkey))
+    plaintext = decode(
+        bundle.key.decrypt(encode(document.blob.data, Encoding.UTF8)),
+        Encoding.UTF8,
+    )
+    perm.document.set_text(plaintext)
+
+    new_key_bytes = pbkdf2hmac_kdf(bundle.key_bytes)
+    new_bundle = fernet_bundle(new_key_bytes)
+    KeyStore.put_bytes(new_bundle.hexkey)
+    new_blob = decode(
+        new_bundle.key.encrypt(encode(document.blob.data, Encoding.UTF8)),
+        Encoding.UTF8,
+    )
+
+    update_doc = Document.update(
+        update={"key_image": new_bundle.key_img, "blob": new_blob},
+        where={"cid": document.cid},
+    )
+
+    return update_doc
+
+
+@use_case
 def grant_perms_on_new_doc_for_third_party(
-    key: PermKey,
+    key: PermissionKey,
     party: ThirdParty,
     data: str,
     account: Account,
@@ -98,7 +160,7 @@ def grant_perms_on_new_doc_for_third_party(
 
 
 def grant_perms_on_new_doc_for_third_party_id(
-    key: PermKey,
+    key: PermissionKey,
     party_id: str,
     data: str,
     account_pubkey: str,
@@ -113,7 +175,7 @@ def grant_perms_on_new_doc_for_third_party_id(
 
 @use_case
 def grant_perms_on_existing_doc_for_third_party(
-    key: PermKey,
+    key: PermissionKey,
     party: ThirdParty,
     account: Account,
     document: Document,
@@ -125,7 +187,7 @@ def grant_perms_on_existing_doc_for_third_party(
 
 
 def grant_perms_on_existing_doc_for_third_party_id(
-    key: PermKey,
+    key: PermissionKey,
     party_id: str,
     account_pubkey: str,
     document_id: str,
@@ -150,7 +212,7 @@ def new_access_token_for_third_party(party: ThirdParty) -> AccessToken:
 
 @use_case
 def revoke_third_party_perms_on_account(
-    key: PermKey, account: Account, party: ThirdParty
+    key: PermissionKey, account: Account, party: ThirdParty
 ) -> Permission:
     perm = Permission.update(
         update={"value": 0},
@@ -178,11 +240,4 @@ def toggle_setting_for_account(account: Account) -> Setting:
 
 @use_case
 def register_new_account(privkey: PublicKey) -> Account:
-    account = create_account()
     raise NotImplementedError
-
-
-@use_case
-def from_mnemnonic(mnemnonic: str) -> str:
-    acct = eth_account_from_mnemnonic(mnemnonic)
-    return pubkey_to_privkey(acct.address)

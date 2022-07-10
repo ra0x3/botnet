@@ -19,10 +19,10 @@ class TestVault(BaseTestClass):
 
     def test_basic_set_and_get(self, keypair):
         pubkey = keypair.pubkey
-        key_image = blake3_sha256(pubkey.to_hex())
-        self.store.put(keypair.pubkey)
+        keyimg = key_image(pubkey.to_hex())
+        self.store.put_key(keypair.pubkey)
 
-        key = self.store.get(key_image)
+        key = self.store.get_key(keyimg)
         assert key == pubkey.to_hex()
 
     @pytest.mark.skip(reason="Not implemented")

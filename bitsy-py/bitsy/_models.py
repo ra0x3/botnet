@@ -19,9 +19,10 @@ class table_name(enum.Enum):
 
 class SettingKey(enum.Enum):
     Other = "other"
+    BitsyVaultDeletegation = "bitsy.vault.delegation"
 
 
-class PermKey(enum.Enum):
+class PermissionKey(enum.Enum):
     Other = "other"
     Read = "read"
     Write = "write"
@@ -200,7 +201,7 @@ class DocumentBlob:
     # FIXME: wtf is this shit?
     def decode(self) -> str:
         if isinstance(self.data, bytes):
-            return decode_utf8(self.data)
+            return decode(self.data, Encoding.UTF8)
         return self.data
 
 
@@ -313,7 +314,7 @@ class AccessToken(BaseModel):
         conn=BitsyConfig.conn,
     )
 
-    def __init__(self, uuid: str):
+    def __init__(self, uuid: str = SQL_NULL):
         self.uuid = uuid
 
     def from_row(row: Tuple[Any]) -> "AccessToken":
@@ -328,7 +329,7 @@ class AccessToken(BaseModel):
         AccessToken.table.create()
 
     def is_null(self) -> bool:
-        return self.uuid == SQL_NULL
+        return self.uuid == SQL_NULL or self.uuid is None
 
 
 class ThirdParty(BaseModel):
@@ -416,7 +417,7 @@ class Permission(BaseModel):
     def __init__(
         self,
         uuid: str,
-        key: PermKey,
+        key: PermissionKey,
         document: "Document",
         value: int,
         account: "Account",
@@ -457,7 +458,7 @@ class Permission(BaseModel):
         party = ThirdParty.get({"uuid": third_party_id})
         return Permission(
             uuid,
-            PermKey(key),
+            PermissionKey(key),
             document,
             value,
             account,
@@ -491,6 +492,16 @@ class Account(BaseModel):
     def create():
         Account.table.create()
 
+    def create_settings(self):
+        settings = [Setting(self.pubkey, SettingKey.BitsyVaultDeletegation, 1)]
+
+        for setting in settings:
+            if setting.key == SettingKey.BitsyVaultDeletegation:
+                access_token = AccessToken(uuid4())
+                access_token.save()
+                setting.access_token = access_token
+            setting.save()
+
 
 class Document(BaseModel):
     table = Table(
@@ -506,29 +517,41 @@ class Document(BaseModel):
                     reference=ForeignKeyReference("accounts", "pubkey"),
                 ),
             ),
+            Column("key_image", ColumnType.Text),
         ],
         conn=BitsyConfig.conn,
     )
 
-    def __init__(self, cid: str, blob: DocumentBlob, account: Account):
+    def __init__(
+        self,
+        cid: str,
+        blob: DocumentBlob,
+        account: Account,
+        key_img: str = SQL_NULL,
+    ):
         self.cid = cid
         self.blob = blob
         self.account = account
+        self.key_img = key_img
 
     def to_row(self) -> Tuple[Any]:
         return (
             quote(self.cid),
             quote(self.blob.decode()),
             quote(self.account.pubkey),
+            quote(self.key_img),
         )
 
     def from_row(row: Tuple[Any]) -> "Document":
-        (cid, blob, pubkey) = row
-        return Document(cid, DocumentBlob(blob), Account(pubkey))
+        (cid, blob, pubkey, key_img) = row
+        return Document(cid, DocumentBlob(blob), Account(pubkey), key_img)
 
     @staticmethod
     def create():
         Document.table.create()
+
+    def set_text(self, text: str):
+        self.blob = DocumentBlob(text)
 
 
 class Setting(BaseModel):
@@ -536,25 +559,57 @@ class Setting(BaseModel):
         table_name.settings.value,
         columns=[
             Column(
-                "id", ColumnType.Integer, auto_increment=True, primary_key=True
+                "account_pubkey",
+                ColumnType.Text,
+                foreign_key=ForeignKey(
+                    "account_pubkey",
+                    reference=ForeignKeyReference("accounts", "pubkey"),
+                ),
             ),
             Column("key", ColumnType.Text),
             Column("value", ColumnType.Integer),
+            Column(
+                "access_token",
+                ColumnType.Integer,
+                foreign_key=ForeignKey(
+                    "access_token",
+                    reference=ForeignKeyReference("access_token", "uuid"),
+                ),
+            ),
         ],
         conn=BitsyConfig.conn,
     )
 
-    def __init__(self, id: int, key: SettingKey, value: int):
-        self.id = id
+    def __init__(
+        self,
+        account_pubkey: str,
+        key: SettingKey,
+        value: int,
+        access_token: Optional[AccessToken] = None,
+    ):
+        self.account_pubkey = account_pubkey
         self.key = key
         self.value = value
+        self.access_token = access_token
 
     def to_row(self) -> Tuple[Any]:
-        return (self.id, quote(self.key.value), quote(self.value))
+        token = (
+            quote(self.access_token.uuid)
+            if self.access_token is not None
+            else quote(None)
+        )
+        return (
+            quote(self.account_pubkey),
+            quote(self.key.value),
+            quote(self.value),
+            token,
+        )
 
     def from_row(row: Tuple[Any]) -> "Setting":
-        (id, key, value) = row
-        return Setting(id, SettingKey(key), value)
+        (account_pubkey, key, value, access_token) = row
+        return Setting(
+            account_pubkey, SettingKey(key), value, AccessToken(access_token)
+        )
 
     @staticmethod
     def create():
