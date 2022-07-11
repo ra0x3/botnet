@@ -7,13 +7,9 @@ from bitsy._crypto import *
 from .conftest import *
 
 
-db_path = "test_uses.db"
-
-
 class TestUsesCases(BaseTestClass):
     def setup_method(self):
-        self.db_path = db_path
-        self.conn = self.setup_method_models(self.db_path)
+        self.conn = self.setup_method_models()
 
     def test_can_create_store_get_access_token(self):
         token = create_access_token()
@@ -51,7 +47,7 @@ class TestUsesCases(BaseTestClass):
         get_account = Account.from_row(result[0])
         assert account.pubkey == get_account.pubkey
 
-        response = KeyStore.get_key(account.pubkey)
+        response = keystore.get_key(account.pubkey)
         assert response == keys.pubkey.to_hex()
 
         result = self.get_from_db(
@@ -82,7 +78,7 @@ class TestUsesCases(BaseTestClass):
         assert doc.blob.data == get_doc.blob.data
         assert doc.key_img is not None
 
-        key = KeyStore.get_bytes(doc.key_img)
+        key = keystore.get_bytes(doc.key_img)
         assert isinstance(key, bytes)
 
     def test_grant_perms_on_new_doc_for_third_party(self, keypair):
@@ -94,7 +90,7 @@ class TestUsesCases(BaseTestClass):
         )
 
         result = self.get_from_db(
-            f"SELECT * FROM permissions WHERE document_id = '{perm.document.cid}';"
+            f"SELECT * FROM permissions WHERE document_cid = '{perm.document.cid}';"
         )
         assert len(result) == 1
 
@@ -117,7 +113,7 @@ class TestUsesCases(BaseTestClass):
         assert isinstance(perm, Permission)
 
         result = self.get_from_db(
-            f"SELECT * FROM permissions WHERE document_id = '{perm.document.cid}';"
+            f"SELECT * FROM permissions WHERE document_cid = '{perm.document.cid}';"
         )
 
         get_perm = Permission.from_row(result[0])
@@ -184,12 +180,9 @@ class TestUsesCases(BaseTestClass):
             party.uuid, document.cid, account.pubkey
         )
 
-        hexkey = KeyStore.get_bytes(updated_doc.key_img)
+        hexkey = keystore.get_bytes(updated_doc.key_img)
         assert isinstance(hexkey, bytes)
 
         fernet = fernet_from(unhexlify(hexkey))
         plaintext = fernet.decrypt(encode(updated_doc.blob.data, Encoding.UTF8))
         assert plaintext == encode(xml_doc, Encoding.UTF8)
-
-
-remove_file([db_path, "test_uses.db-journal"])

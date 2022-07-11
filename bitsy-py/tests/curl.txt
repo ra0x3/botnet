@@ -10,7 +10,7 @@ curl -X POST http://127.0.0.1:8000/graphql -d '{"query": "query { hello }"}' -H 
 curl -X POST http://127.0.0.1:8000/graphql -d '{"query": "query { access_token(uuid: \"9e1a0229-e6cd-4933-a1c9-188cad336d7d\") { uuid } }"}' -H "Content-type: application/json" | json_pp
 
 # third party
-curl -X POST http://127.0.0.1:8000/graphql -d '{"query": "query { third_party(uuid: \"60f15444-47ad-483d-9ff3-de36e27fafa8\") { uuid access_token { uuid } } }"}' -H "Content-type: application/json" | json_pp
+curl -X POST http://127.0.0.1:8000/graphql -d '{"query": "query { third_party(uuid: \"abd33730-5d54-4c08-aea7-49bd1b71c475\") { uuid access_token { uuid } } }"}' -H "Content-type: application/json" | json_pp
 curl -X POST http://127.0.0.1:8000/graphql -d '{"query": "query { third_party(uuid: \"60f15444-47ad-483d-9ff3-de36e27fafa8\", access_token: \"577ef7ee-5bb3-4eac-a2c8-6de2760a6950\" ) { uuid access_token { uuid } } }"}' -H "Content-type: application/json" | json_pp
 
 # pubkey

@@ -5,16 +5,6 @@ from bitsy._t import *
 from bitsy._models import Model
 
 
-def create_test_db_and_bootstrap_tables(
-    path: str, models: List[Model]
-) -> sqlite3.Connection:
-    conn = create_test_db(path)
-    for model in models:
-        model.table.conn = conn
-        model.create()
-    return conn
-
-
 # NOTE: This is a fake/test account - don't add anything more that $1 to it
 class RealMetamaskAcct:
     password = "supersecretpassword12345*"

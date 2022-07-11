@@ -200,8 +200,8 @@ class VaultConnection(BaseConnection):
         return self._store.values()
 
 
-Connection = TypeVar(
-    "Connection",
+_Connection = TypeVar(
+    "_Connection",
     bound=Union[InMemoryConnection, VaultConnection],
     covariant=True,
 )
@@ -210,9 +210,9 @@ Connection = TypeVar(
 class KeyStore_:
     def __init__(self, config: BitsyConfig, *args, **kwargs):
         self.config = config
-        self._store: Connection = self._connection()
+        self._store: _Connection = self._connection()
 
-    def _connection(self) -> Connection:
+    def _connection(self) -> _Connection:
         if self.config.keystore_provider == KeyStoreProvider.InMemory.value:
             return InMemoryConnection(self.config)
         elif self.config.keystore_provider == KeyStoreProvider.Vault.value:
@@ -233,4 +233,4 @@ class KeyStore_:
         self._store.put_bytes(key)
 
 
-KeyStore = KeyStore_(BitsyConfig)
+keystore = KeyStore_(BitsyConfig)

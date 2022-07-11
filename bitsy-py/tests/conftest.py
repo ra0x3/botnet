@@ -10,22 +10,24 @@ from bitsy._t import *
 from bitsy._const import web3
 from bitsy._models import Model
 from bitsy._crypto import Keypair
+from bitsy._config import BitsyConfig
 
 from .utils import *
 
 
-def create_test_db_and_bootstrap_tables(path: str, models: List[Model]):
-    conn = create_test_db(path)
+config = BitsyConfig.from_default_manifest()
+
+
+def create_test_db_and_bootstrap_tables(models: List[Model]):
     for model in models:
-        model.table.conn = conn
+        model.table.conn = config.conn
         model.create()
-    return conn
+    return config.conn
 
 
 class BaseTestClass:
-    def setup_method_models(self, db_path: str):
+    def setup_method_models(self):
         return create_test_db_and_bootstrap_tables(
-            db_path,
             models=[
                 Model.AccessToken,
                 Model.ThirdParty,

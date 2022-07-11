@@ -5,6 +5,7 @@ import enum
 import uuid
 import codecs
 import binascii
+import psycopg2
 from black import Encoding
 from blake3 import blake3
 
@@ -12,10 +13,18 @@ from ._t import *
 
 
 def create_test_db(path: str) -> sqlite3.Connection:
-    conn = sqlite3.connect(path, check_same_thread=False)
+    conn = sqlite3.connect(path, check_same_thread=False, timeout=5)
     # curr = conn.execute("PRAGMA locking_mode = EXCLUSIVE")
     os.chmod(path, 0o777)
     return conn
+
+
+def create_postgres_conn(
+    database: str, user: str, password: str, host: str, port: str
+):
+    return psycopg2.connect(
+        database=database, user=user, password=password, host=host, port=port
+    )
 
 
 def remove_file(paths: List[str]):

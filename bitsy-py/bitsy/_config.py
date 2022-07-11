@@ -1,10 +1,10 @@
 import yaml
 import enum
+import os
 import json
-import sqlite3
 
 from ._t import *
-from ._utils import create_test_db
+from ._utils import *
 
 
 class KeyStoreProvider(enum.Enum):
@@ -12,7 +12,7 @@ class KeyStoreProvider(enum.Enum):
     Vault = "vault"
 
 
-class LogLevel(enum.Enum):
+class _LogLevel(enum.Enum):
     INFO = "INFO"
     DEBUG = "DEBUG"
     WARN = "WARN"
@@ -29,15 +29,25 @@ class BitsyConfig:
 
     vault_address: str = "http://127.0.0.1:8200"
 
-    bootstrap_db: bool = True
+    pg_database: str = "bitsy"
 
-    log_level: LogLevel = LogLevel.DEBUG
+    pg_user: str = "postgres"
+
+    pg_password: str = ""
+
+    pg_host: str = "127.0.0.1"
+
+    pg_port: str = "5432"
+
+    log_level: _LogLevel = _LogLevel.DEBUG
 
     workers: int = 3
 
     log_file: str = "bitsy.log"
 
-    conn: sqlite3.Connection = create_test_db(db_path)
+    conn = create_postgres_conn(
+        pg_database, pg_user, pg_password, pg_host, pg_port
+    )
 
     keystore_provider: KeyStoreProvider = KeyStoreProvider.Vault.value
 
@@ -46,6 +56,20 @@ class BitsyConfig:
 
     @staticmethod
     def from_manifest(path: str) -> "BitsyConfig":
+        return BitsyConfig._load_config(path)
+
+    @staticmethod
+    def from_default_manifest() -> "BitsyConfig":
+        env = env_var("ENV")
+        path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "config",
+            f"bitsy.{env}.yaml",
+        )
+        return BitsyConfig._load_config(path)
+
+    @staticmethod
+    def _load_config(path: str) -> "BitsyConfig":
         data = None
         with open(path, "r") as file:
             data = yaml.safe_load(file)

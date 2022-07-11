@@ -34,7 +34,7 @@ class Query:
     def permission(
         self,
         uuid: Optional[str] = None,
-        document_id: Optional[str] = None,
+        document_cid: Optional[str] = None,
         value: Optional[int] = None,
         account_pubkey: Optional[str] = None,
         third_party_id: Optional[str] = None,
@@ -43,7 +43,7 @@ class Query:
             where=remove_empty_keys(
                 {
                     "uuid": uuid,
-                    "document_id": document_id,
+                    "document_cid": document_cid,
                     "value": value,
                     "account_pubkey": account_pubkey,
                     "third_party_id": third_party_id,

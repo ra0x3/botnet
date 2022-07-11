@@ -1,14 +1,19 @@
 import abc
 import enum
+import time
+import logging
 
 from ._t import *
 from ._utils import *
 from ._config import BitsyConfig
 
-SQL_NULL = "null"
+_SQL_NULL = "null"
 
 
-class table_name(enum.Enum):
+_logger = logging.getLogger("bitsy.models")
+
+
+class _table_name(enum.Enum):
     access_tokens = "access_tokens"
     third_parties = "third_parties"
     permissions = "permissions"
@@ -30,15 +35,15 @@ class PermissionKey(enum.Enum):
 
 
 class ColumnType(enum.Enum):
-    Text = "Text"
-    Real = "Real"
-    Integer = "Integer"
-    Blob = "Blob"
+    Varchar = "varchar(255)"
+    Decimal = "decimal"
+    Integer = "integer"
+    Bytea = "bytea"
     Null = "Null"
     ForeignKey = "ForeignKey"
 
 
-class DeleteAction(enum.Enum):
+class _DeleteAction(enum.Enum):
     CASCADE = "CASCADE"
     NO_ACTION = "NO ACTION"
     SET_NULL = "SET NULL"
@@ -58,7 +63,7 @@ class ForeignKey:
         self,
         local_column_name: str,
         reference: ForeignKeyReference,
-        on_delete: DeleteAction = DeleteAction.NO_ACTION,
+        on_delete: _DeleteAction = _DeleteAction.NO_ACTION,
     ):
         self.local_column_name = local_column_name
         self.reference = reference
@@ -106,7 +111,7 @@ class Column:
         self.default = default
 
     def create_fragment(self) -> str:
-        frag = f"  {self.name} {self.type.name}"
+        frag = f"  {self.name} {self.type.value}"
 
         if self.foreign_key:
             assert not (
@@ -158,6 +163,7 @@ class Table:
         return stmnt
 
     def create(self):
+        _logger.debug("creating table(%s)", self.name)
         cursor = self.conn.cursor()
         stmnt = self._create_stmnt()
         cursor.execute(stmnt)
@@ -168,7 +174,7 @@ class Table:
         index = Index(index_name, unique, table_name, column_name)
         cursor = self.conn.cursor()
         cursor.execute(index.create_fragment())
-
+        self.conn.commit()
         return self
 
     def reorganize_foreign_keys(self, stmnt: str) -> str:
@@ -226,11 +232,9 @@ class BaseModel(ModelEntry):
         columns_frag = ", ".join([column.name for column in self.table.columns])
         values_frag = ", ".join(self.to_row())
         stmnt = f"INSERT INTO {self.table.name} ({columns_frag}) VALUES ({values_frag});"
-        # print(">>> STMTT ", stmnt)
 
         cursor = self.table.conn.cursor()
         cursor.execute(stmnt)
-        self.table.conn.commit()
 
     @classmethod
     def all(cls) -> List["BaseModel"]:
@@ -265,8 +269,6 @@ class BaseModel(ModelEntry):
         cursor = cls.table.conn.cursor()
         cursor.execute(stmnt)
         result = cursor.fetchone()
-
-        cls.table.conn.commit()
 
         return cls.from_row(result)
 
@@ -307,39 +309,44 @@ class BaseModel(ModelEntry):
 
 class AccessToken(BaseModel):
     table = Table(
-        table_name.access_tokens.value,
+        _table_name.access_tokens.value,
         columns=[
-            Column("uuid", ColumnType.Text, unique=True),
+            Column("uuid", ColumnType.Varchar, unique=True),
+            Column("expiry", ColumnType.Integer, default=-1),
         ],
         conn=BitsyConfig.conn,
     )
 
-    def __init__(self, uuid: str = SQL_NULL):
+    def __init__(self, uuid: str = _SQL_NULL, expiry: int = -1):
         self.uuid = uuid
+        self.expiry = expiry
 
     def from_row(row: Tuple[Any]) -> "AccessToken":
-        (key,) = row
-        return AccessToken(key)
+        (key, expiry) = row
+        return AccessToken(key, expiry)
 
     def to_row(self) -> Tuple[Any]:
-        return (quote(self.uuid),)
+        return (quote(self.uuid), quote(self.expiry))
 
     @staticmethod
     def create():
         AccessToken.table.create()
 
     def is_null(self) -> bool:
-        return self.uuid == SQL_NULL or self.uuid is None
+        return self.uuid == _SQL_NULL or self.uuid is None
+
+    def is_expired(self) -> bool:
+        return self.expiry > int(time.time())
 
 
 class ThirdParty(BaseModel):
     table = Table(
-        table_name.third_parties.value,
+        _table_name.third_parties.value,
         columns=[
-            Column("uuid", ColumnType.Text, unique=True),
+            Column("uuid", ColumnType.Varchar, unique=True),
             Column(
                 "access_token",
-                ColumnType.Text,
+                ColumnType.Varchar,
                 foreign_key=ForeignKey(
                     "access_token",
                     reference=ForeignKeyReference("access_tokens", "uuid"),
@@ -356,7 +363,7 @@ class ThirdParty(BaseModel):
     def to_row(self) -> Tuple[Any]:
         if self.access_token:
             return (quote(self.uuid), quote(self.access_token.uuid))
-        return (quote(self.uuid), SQL_NULL)
+        return (quote(self.uuid), _SQL_NULL)
 
     def from_row(row: Tuple[Any]) -> "ThirdParty":
         row = tuple([item for item in row if item])
@@ -367,7 +374,7 @@ class ThirdParty(BaseModel):
         return ThirdParty(uuid)
 
     def table_name(self) -> str:
-        return table_name.third_parties.value
+        return _table_name.third_parties.value
 
     def __str__(self) -> str:
         return self.uuid
@@ -378,24 +385,24 @@ class ThirdParty(BaseModel):
 
 
 class Permission(BaseModel):
-    name = table_name.permissions.value
+    name = _table_name.permissions.value
     table = Table(
-        table_name.permissions.value,
+        _table_name.permissions.value,
         columns=[
-            Column("uuid", ColumnType.Text, unique=True),
-            Column("key", ColumnType.Text),
+            Column("uuid", ColumnType.Varchar, unique=True),
+            Column("key", ColumnType.Varchar),
             Column(
-                "document_id",
-                ColumnType.Text,
+                "document_cid",
+                ColumnType.Varchar,
                 foreign_key=ForeignKey(
-                    "document_id",
-                    reference=ForeignKeyReference("documents", "id"),
+                    "document_cid",
+                    reference=ForeignKeyReference("documents", "cid"),
                 ),
             ),
             Column("value", ColumnType.Integer, default=0),
             Column(
                 "account_pubkey",
-                ColumnType.Text,
+                ColumnType.Varchar,
                 foreign_key=ForeignKey(
                     "account_pubkey",
                     reference=ForeignKeyReference("accounts", "pubkey"),
@@ -403,7 +410,7 @@ class Permission(BaseModel):
             ),
             Column(
                 "third_party_id",
-                ColumnType.Text,
+                ColumnType.Varchar,
                 foreign_key=ForeignKey(
                     "third_party_id",
                     reference=ForeignKeyReference("third_parties", "uuid"),
@@ -447,13 +454,13 @@ class Permission(BaseModel):
         (
             uuid,
             key,
-            document_id,
+            document_cid,
             value,
             pubkey,
             third_party_id,
             ttl,
         ) = row
-        document = Document.get({"cid": document_id})
+        document = Document.get({"cid": document_cid})
         account = Account.get({"pubkey": pubkey})
         party = ThirdParty.get({"uuid": third_party_id})
         return Permission(
@@ -473,8 +480,8 @@ class Permission(BaseModel):
 
 class Account(BaseModel):
     table = Table(
-        table_name.accounts.value,
-        columns=[Column("pubkey", ColumnType.Text, unique=True)],
+        _table_name.accounts.value,
+        columns=[Column("pubkey", ColumnType.Varchar, unique=True)],
         conn=BitsyConfig.conn,
     )
 
@@ -505,19 +512,19 @@ class Account(BaseModel):
 
 class Document(BaseModel):
     table = Table(
-        table_name.documents.value,
+        _table_name.documents.value,
         columns=[
-            Column("cid", ColumnType.Text, unique=True),
-            Column("blob", ColumnType.Blob),
+            Column("cid", ColumnType.Varchar, unique=True),
+            Column("blob", ColumnType.Bytea),
             Column(
                 "account_pubkey",
-                ColumnType.Integer,
+                ColumnType.Varchar,
                 foreign_key=ForeignKey(
                     "account_pubkey",
                     reference=ForeignKeyReference("accounts", "pubkey"),
                 ),
             ),
-            Column("key_image", ColumnType.Text),
+            Column("key_image", ColumnType.Varchar),
         ],
         conn=BitsyConfig.conn,
     )
@@ -527,7 +534,7 @@ class Document(BaseModel):
         cid: str,
         blob: DocumentBlob,
         account: Account,
-        key_img: str = SQL_NULL,
+        key_img: str = _SQL_NULL,
     ):
         self.cid = cid
         self.blob = blob
@@ -544,7 +551,12 @@ class Document(BaseModel):
 
     def from_row(row: Tuple[Any]) -> "Document":
         (cid, blob, pubkey, key_img) = row
-        return Document(cid, DocumentBlob(blob), Account(pubkey), key_img)
+        return Document(
+            cid,
+            DocumentBlob(decode(blob, Encoding.UTF8)),
+            Account(pubkey),
+            key_img,
+        )
 
     @staticmethod
     def create():
@@ -556,24 +568,24 @@ class Document(BaseModel):
 
 class Setting(BaseModel):
     table = Table(
-        table_name.settings.value,
+        _table_name.settings.value,
         columns=[
             Column(
                 "account_pubkey",
-                ColumnType.Text,
+                ColumnType.Varchar,
                 foreign_key=ForeignKey(
                     "account_pubkey",
                     reference=ForeignKeyReference("accounts", "pubkey"),
                 ),
             ),
-            Column("key", ColumnType.Text),
+            Column("key", ColumnType.Varchar),
             Column("value", ColumnType.Integer),
             Column(
                 "access_token",
-                ColumnType.Integer,
+                ColumnType.Varchar,
                 foreign_key=ForeignKey(
                     "access_token",
-                    reference=ForeignKeyReference("access_token", "uuid"),
+                    reference=ForeignKeyReference("access_tokens", "uuid"),
                 ),
             ),
         ],

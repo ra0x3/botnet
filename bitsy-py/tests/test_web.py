@@ -8,14 +8,11 @@ from bitsy._uses import *
 from .utils import *
 from .conftest import *
 
-db_path = "test_web.db"
-
 
 class TestWeb(BaseTestClass):
     def setup_method(self):
         self.client = TestClient(_app)
-        self.db_path = db_path
-        self.conn = self.setup_method_models(self.db_path)
+        self.conn = self.setup_method_models()
 
     def test_route_hello_world(self):
         response = self.client.get("/")
@@ -50,7 +47,7 @@ class TestWeb(BaseTestClass):
             )
         )
 
-        hexkey = KeyStore.get_bytes(document.key_img)
+        hexkey = keystore.get_bytes(document.key_img)
 
         key = fernet_from(unhexlify(hexkey))
 
@@ -66,7 +63,7 @@ class TestWeb(BaseTestClass):
         response = self.client.post("/access-token", json={"uuid": party.uuid})
         rjson = response.json()
 
-        token = AccessToken.from_row((rjson["uuid"],))
+        token = AccessToken.from_row((rjson["uuid"], rjson["expiry"]))
         assert response.status_code == status.HTTP_200_OK
         assert isinstance(token.uuid, str)
 
@@ -91,7 +88,7 @@ class TestWeb(BaseTestClass):
                 "key": PermissionKey.Read.value,
                 "party_id": party.uuid,
                 "pubkey": account.pubkey,
-                "document_id": document.cid,
+                "document_cid": document.cid,
             },
         )
         rjson = response.json()
@@ -110,6 +107,3 @@ class TestWeb(BaseTestClass):
 
         assert response.status_code == status.HTTP_200_OK
         assert permission.account.pubkey == account.pubkey
-
-
-remove_file(db_path)

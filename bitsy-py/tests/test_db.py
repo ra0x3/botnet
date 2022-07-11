@@ -2,8 +2,6 @@ from bitsy._db import *
 from bitsy._models import *
 from bitsy._utils import *
 
-db_path = "test_db.db"
-
 
 class TestIndex:
     def test_index_create_fragment_returns_proper_fragment(self):
@@ -37,7 +35,7 @@ class TestColumn:
         )
         assert (
             column.create_fragment()
-            == "  foo Integer,\n  FOREIGN KEY(foo) REFERENCES bar(id) ON DELETE NO ACTION,\n"
+            == "  foo integer,\n  FOREIGN KEY(foo) REFERENCES bar(id) ON DELETE NO ACTION,\n"
         )
 
 
@@ -55,8 +53,8 @@ class TestTable:
                     auto_increment=True,
                     primary_key=True,
                 ),
-                Column("uuid", ColumnType.Text),
-                Column("bytes", ColumnType.Blob),
+                Column("uuid", ColumnType.Varchar),
+                Column("bytes", ColumnType.Bytea),
             ],
             conn=self.conn,
         )
@@ -65,9 +63,9 @@ class TestTable:
         assert (
             stmnt
             == """CREATE TABLE IF NOT EXISTS foo (
-  id Integer PRIMARY KEY AUTOINCREMENT,
-  uuid Text,
-  bytes Blob
+  id integer PRIMARY KEY AUTOINCREMENT,
+  uuid varchar(255),
+  bytes bytea
 );"""
         )
 
@@ -86,7 +84,7 @@ class TestTable:
                     auto_increment=True,
                     primary_key=True,
                 ),
-                Column("name", ColumnType.Text),
+                Column("name", ColumnType.Varchar),
             ],
             conn=self.conn,
         )
@@ -99,7 +97,7 @@ class TestTable:
                     auto_increment=True,
                     primary_key=True,
                 ),
-                Column("uuid", ColumnType.Text),
+                Column("uuid", ColumnType.Varchar),
                 Column(
                     "account_id",
                     ColumnType.Integer,
@@ -116,9 +114,9 @@ class TestTable:
         assert (
             stmnt
             == """CREATE TABLE IF NOT EXISTS documents (
-  id Integer PRIMARY KEY AUTOINCREMENT,
-  uuid Text,
-  account_id Integer,
+  id integer PRIMARY KEY AUTOINCREMENT,
+  uuid varchar(255),
+  account_id integer,
   FOREIGN KEY(account_id) REFERENCES accounts(id) ON DELETE NO ACTION
 );"""
         )
@@ -129,6 +127,3 @@ class TestTable:
 class TestDabase:
     def test_foo(self):
         assert 1 == 2 - 1
-
-
-remove_file([db_path])

@@ -13,6 +13,7 @@ from ._utils import *
 @strawberry.type
 class AccessToken(BaseModel):
     uuid: str
+    expiry: int
 
 
 @strawberry.type
@@ -36,6 +37,7 @@ class Document(BaseModel):
     cid: str
     blob: DocumentBlob
     account: Account
+    key_image: str
 
 
 @strawberry.type
@@ -53,6 +55,7 @@ class Setting(BaseModel):
     id: int
     key: SettingKey
     value: int
+    access_token: AccessToken
 
 
 class DummyRoute(APIRoute):
@@ -113,7 +116,7 @@ async def route_grant_perms_on_doc_for_third_party(request: Request):
 
     body = await request.json()
 
-    doc_id = body.get("document_id")
+    doc_id = body.get("document_cid")
     doc = body.get("data")
 
     if doc_id is None:
@@ -129,7 +132,7 @@ async def route_grant_perms_on_doc_for_third_party(request: Request):
         PermissionKey(body["key"]),
         body["party_id"],
         body["pubkey"],
-        body["document_id"],
+        body["document_cid"],
     )
     return perm
 
@@ -140,11 +143,11 @@ async def route_third_party_access_document_id(request: Request):
     body = await request.json()
 
     third_party_id = body["third_party_id"]
-    document_id = body["document_id"]
+    document_cid = body["document_cid"]
     account_pubkey = body["account_pubkey"]
 
     document = third_party_access_document_id(
-        third_party_id, document_id, account_pubkey
+        third_party_id, document_cid, account_pubkey
     )
 
     return document

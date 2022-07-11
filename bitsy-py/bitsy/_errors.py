@@ -20,3 +20,7 @@ class DatabaseError(_BitsyError):
 
 class VaultError(_BitsyError):
     pass
+
+
+class ExpiredAccessTokenError(_BitsyError):
+    pass
