@@ -15,8 +15,10 @@ class TestUsesCases(BaseTestClass):
         token = create_access_token()
         assert isinstance(token, AccessToken)
 
-        result = self.get_from_db("SELECT * FROM access_tokens;")
-        assert len(result) == 1
+        result = self.get_from_db(
+            f"SELECT * FROM access_tokens WHERE uuid = '{token.uuid}';"
+        )
+        assert len(result) >= 1
 
         get_token = AccessToken.from_row(result[0])
         assert get_token.uuid == token.uuid

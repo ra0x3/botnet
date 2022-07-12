@@ -13,22 +13,32 @@ class Query:
         return "Hello World"
 
     @strawberry.field
-    def access_token(self, uuid: str) -> List[AccessToken]:
-        return Model.AccessToken.get_many(where={"uuid": uuid})
+    def access_token(self, uuid: str) -> AccessToken:
+        return Model.AccessToken.get(where={"uuid": uuid})
 
     @strawberry.field
     def third_party(
         self, uuid: Optional[str] = None, access_token: Optional[str] = None
     ) -> ThirdParty:
-        return Model.ThirdParty.get_many(
+        return Model.ThirdParty.get(
             where=remove_empty_keys(
                 {"uuid": uuid, "access_token": access_token}
             )
         )
 
     @strawberry.field
-    def account(self, pubkey: str) -> List[Account]:
+    def account(self, pubkey: str) -> Account:
         return Model.Account.get(where={"pubkey": pubkey})
+
+    @strawberry.field
+    def document(
+        self, cid: Optional[str], account_pubkey: Optional[str] = None
+    ) -> Document:
+        return Model.Document.get(
+            where=remove_empty_keys(
+                {"cid": cid, "account_pubkey": account_pubkey}
+            )
+        )
 
     @strawberry.field
     def permission(
@@ -38,8 +48,8 @@ class Query:
         value: Optional[int] = None,
         account_pubkey: Optional[str] = None,
         third_party_id: Optional[str] = None,
-    ) -> List[Permission]:
-        return Model.Permission.get_many(
+    ) -> Permission:
+        return Model.Permission.get(
             where=remove_empty_keys(
                 {
                     "uuid": uuid,
@@ -48,16 +58,6 @@ class Query:
                     "account_pubkey": account_pubkey,
                     "third_party_id": third_party_id,
                 }
-            )
-        )
-
-    @strawberry.field
-    def document(
-        self, cid: Optional[str], account_pubkey: Optional[str] = None
-    ) -> List[Document]:
-        return Model.Document.get_many(
-            where=remove_empty_keys(
-                {"cid": cid, "account_pubkey": account_pubkey}
             )
         )
 

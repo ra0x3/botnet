@@ -5,6 +5,10 @@ from bitsy._t import *
 from bitsy._models import Model
 
 
+def double_quote(s: str) -> str:
+    return f'"{s}"'
+
+
 # NOTE: This is a fake/test account - don't add anything more that $1 to it
 class RealMetamaskAcct:
     password = "supersecretpassword12345*"
