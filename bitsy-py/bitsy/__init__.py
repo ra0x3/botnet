@@ -1,20 +1,19 @@
-import os
 import enum
 import logging
 import sys
 
 from uvicorn import Config, Server
 from loguru import logger
-from dotenv import load_dotenv
 
-from ._utils import env_var
+from ._utils import load_dot_env
 
-dotenv_path = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    f"env/.env.{env_var('ENV')}",
-)
-load_dotenv(dotenv_path)
 
+class Environment(enum.Enum):
+    Development = "dev"
+    Production = "prod"
+
+
+load_dot_env()
 
 from ._web import app as _app
 from ._graphql import graphql_app
@@ -24,15 +23,7 @@ from ._t import *
 config = BitsyConfig.from_default_manifest()
 
 
-class _Environment(enum.Enum):
-    Development = "dev"
-    Production = "prod"
-
-
 _LOG_LEVEL = logging.getLevelName(config.log_level)
-
-
-# NOTE: Referencing https://pawamoy.github.io/posts/unify-logging-for-a-gunicorn-uvicorn-app/
 
 
 class _InterceptHandler(logging.Handler):
@@ -59,8 +50,7 @@ def _setup_logging():
     logging.root.handlers = [_InterceptHandler()]
     logging.root.setLevel(_LOG_LEVEL)
 
-    # remove every other logger's handlers
-    # and propagate to root logger
+    # remove every other logger's handlers and propagate to root logger
     for name in logging.root.manager.loggerDict.keys():
         logging.getLogger(name).handlers = []
         logging.getLogger(name).propagate = True
@@ -79,7 +69,7 @@ server = Server(
         port=config.api_port,
         log_level=_LOG_LEVEL,
         workers=config.workers,
-        reload=config.env == _Environment.Development.value,
+        reload=config.env == Environment.Development.value,
         use_colors=True,
         timeout_keep_alive=5,
         log_config={
@@ -118,8 +108,8 @@ server = Server(
                 },
             },
         },
-        debug=config.env == _Environment.Development.value,
-        env_file=dotenv_path,
+        debug=config.env == Environment.Development.value,
+        # env_file=dotenv_path,
     ),
 )
 

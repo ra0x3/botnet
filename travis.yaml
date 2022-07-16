@@ -1,15 +1,19 @@
+# https://docs.travis-ci.com/user/environment-variables/
 language: python
 python:
   - "3.9"
-
+env:
+  - PYDIR=$TRAVIS_BUILD_DIR/bitsy-py
 
 before_install:
-  - cd requirements/
+  - cd $PYDIR/requirements/
   - pip install pipenv
 
 install:
+  - cd $PYDIR
   - pipenv install
   - pipenv sync --dev
+  - source sysadmin/.bash_aliases
 
 jobs:
   include:

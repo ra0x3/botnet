@@ -22,5 +22,9 @@ class VaultError(_BitsyError):
     pass
 
 
+class ResourceDoesNotExist(_BitsyError):
+    pass
+
+
 class ExpiredAccessTokenError(_BitsyError):
     pass

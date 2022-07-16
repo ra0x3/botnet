@@ -60,7 +60,7 @@ class BitsyConfig:
 
     @staticmethod
     def from_default_manifest() -> "BitsyConfig":
-        env = env_var("ENV")
+        env = env_with_default()
         path = os.path.join(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
             "config",

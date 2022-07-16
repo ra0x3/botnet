@@ -33,7 +33,7 @@ class TestWeb(BaseTestClass):
         account = create_account(keypair.pubkey)
         response = self.client.post(
             "/document",
-            json={"data": "Attack at dawn!", "pubkey": account.pubkey},
+            json={"data": "Attack at dawn!", "account_pubkey": account.pubkey},
         )
         assert response.status_code == status.HTTP_200_OK
         rjson = response.json()
@@ -73,7 +73,7 @@ class TestWeb(BaseTestClass):
 
         pubkey = mnemnonic_to_pubkey(mnemnonic)
 
-        account = Account.from_row((rjson["pubkey"],))
+        account = Account.from_row((rjson["pubkey"], rjson["created_at"]))
         assert response.status_code == status.HTTP_200_OK
         assert account.pubkey == blake3_sha256(pubkey.to_hex())
 
@@ -85,9 +85,9 @@ class TestWeb(BaseTestClass):
         response = self.client.post(
             "/permission",
             json={
-                "key": PermissionKey.Read.value,
+                "permission_key": PermissionKey.Read.value,
                 "party_id": party.uuid,
-                "pubkey": account.pubkey,
+                "account_pubkey": account.pubkey,
                 "document_cid": document.cid,
             },
         )
@@ -107,3 +107,90 @@ class TestWeb(BaseTestClass):
 
         assert response.status_code == status.HTTP_200_OK
         assert permission.account.pubkey == account.pubkey
+
+    def test_route_get_stats_for_account_id(self, keypair, xml_doc):
+        account = create_account(keypair.pubkey)
+        party = create_third_party()
+        _ = new_access_token_for_third_party(party)
+        document = create_document_for_account(xml_doc, account)
+
+        response = self.client.get(
+            "/account-stats", json={"account_pubkey": account.pubkey}
+        )
+        rjson = response.json()
+
+        conditions = ["account_age" in rjson, "perm_count" in rjson]
+
+        assert all(conditions)
+
+    def test_route_add_setting_to_account_id(self, keypair):
+        account = create_account(keypair.pubkey)
+        response = self.client.post(
+            "/setting",
+            json={
+                "account_pubkey": account.pubkey,
+                "setting_key": SettingKey.Other.value,
+                "value": 1,
+            },
+        )
+        rjson = response.json()
+        setting = Setting.from_row(
+            (
+                rjson["account_pubkey"],
+                rjson["key"],
+                rjson["value"],
+                rjson["access_token"],
+            )
+        )
+        assert setting.account_pubkey == account.pubkey
+        assert setting.key == SettingKey.Other
+        assert setting.enabled()
+
+    def test_route_toggle_account_setting_id(self, keypair):
+        account = create_account(keypair.pubkey)
+        setting = add_setting_to_account(account, SettingKey.Other, 1)
+        assert setting.enabled()
+        response = self.client.put(
+            "/setting",
+            json={
+                "account_pubkey": account.pubkey,
+                "setting_key": SettingKey.Other.value,
+            },
+        )
+        rjson = response.json()
+        setting = Setting.from_row(
+            (
+                rjson["account_pubkey"],
+                rjson["key"],
+                rjson["value"],
+                rjson["access_token"],
+            )
+        )
+        assert setting.account_pubkey == account.pubkey
+        assert setting.key == SettingKey.Other
+        assert setting.disabled()
+
+    def test_route_revoke_perms_on_existing_doc_for_third_party_id(
+        self, keypair, xml_doc
+    ):
+        account = create_account(keypair.pubkey)
+        party = create_third_party()
+        document = create_document_for_account(xml_doc, account)
+        perm = grant_perms_on_existing_doc_for_third_party(
+            PermissionKey.Read, party, account, document
+        )
+
+        _ = self.client.delete(
+            "/permission",
+            json={
+                "party_id": party.uuid,
+                "account_pubkey": account.pubkey,
+                "document_cid": document.cid,
+                "permission_key": PermissionKey.Read.value,
+            },
+        )
+
+        perm = self.get_from_db(
+            f"SELECT * FROM permissions WHERE uuid = '{perm.uuid}';"
+        )
+        assert not perm

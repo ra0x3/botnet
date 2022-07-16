@@ -90,7 +90,7 @@ async def route_create_third_party(request: Request):
 async def route_create_document(request: Request):
     body = await request.json()
     doc: Document = create_document_for_account_id(
-        body["pubkey"], encode(body["data"], Encoding.UTF8)
+        body["account_pubkey"], encode(body["data"], Encoding.UTF8)
     )
     return doc
 
@@ -117,24 +117,36 @@ async def route_grant_perms_on_doc_for_third_party(request: Request):
     body = await request.json()
 
     doc_id = body.get("document_cid")
-    doc = body.get("data")
 
+    perm: Permission
     if doc_id is None:
         perm: Permission = grant_perms_on_new_doc_for_third_party_id(
-            PermissionKey(body["key"]),
+            PermissionKey(body["permission_key"]),
             body["party_id"],
-            encode(doc, Encoding.UTF8),
-            body["pubkey"],
+            encode(body["data"], Encoding.UTF8),
+            body["account_pubkey"],
         )
-        return perm
-
-    perm: Permission = grant_perms_on_existing_doc_for_third_party_id(
-        PermissionKey(body["key"]),
-        body["party_id"],
-        body["pubkey"],
-        body["document_cid"],
-    )
+    else:
+        perm: Permission = grant_perms_on_existing_doc_for_third_party_id(
+            PermissionKey(body["permission_key"]),
+            body["party_id"],
+            body["account_pubkey"],
+            body["document_cid"],
+        )
     return perm
+
+
+@app.delete("/permission")
+async def route_revoke_perms_on_existing_doc_for_third_party_id(
+    request: Request,
+):
+    body = await request.json()
+    return revoke_perms_on_existing_doc_for_third_party_id(
+        body["party_id"],
+        body["document_cid"],
+        body["account_pubkey"],
+        PermissionKey[body["permission_key"]],
+    )
 
 
 @app.post("/third-party-access-doc")
@@ -151,6 +163,35 @@ async def route_third_party_access_document_id(request: Request):
     )
 
     return document
+
+
+@app.get("/account-stats")
+async def route_get_stats_for_account_id(request: Request):
+    body = await request.json()
+
+    account_pubkey = body["account_pubkey"]
+    return get_stats_for_account_id(account_pubkey)
+
+
+@app.post("/setting")
+async def route_add_setting_to_account_id(request: Request):
+    body = await request.json()
+
+    return add_setting_to_account_id(
+        account_pubkey=body["account_pubkey"],
+        key=SettingKey[body["setting_key"]],
+        value=body["value"],
+    )
+
+
+@app.put("/setting")
+async def route_toggle_account_setting_id(request: Request):
+    body = await request.json()
+
+    return toggle_account_setting_id(
+        account_pubkey=body["account_pubkey"],
+        key=SettingKey(body["setting_key"]),
+    )
 
 
 router = APIRouter(route_class=DummyRoute)

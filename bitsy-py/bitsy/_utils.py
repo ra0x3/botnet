@@ -1,15 +1,46 @@
 import sqlite3
 import pathlib
 import os
+import time
 import enum
 import uuid
 import codecs
 import binascii
 import psycopg2
+from dotenv import load_dotenv
 from black import Encoding
 from blake3 import blake3
+from ._const import SQL_NULL
 
 from ._t import *
+
+
+def is_nullish(value: Any) -> bool:
+    return value == SQL_NULL or value == "" or value is None
+
+
+class Environment(enum.Enum):
+    Development = "dev"
+    Production = "prod"
+
+
+def env_with_default() -> Environment:
+    return (
+        Environment.Development.value
+        if "ENV" not in os.environ
+        else env_var("ENV")
+    )
+
+
+def load_dot_env():
+    pwd = os.environ["PWD"]
+    env_name = env_with_default()
+    env_path = os.path.join(pwd, "env", f".env.{env_name}")
+    load_dotenv(env_path)
+
+
+class defaults:
+    access_token_ttl: int = 60 * 60 * 24
 
 
 def create_test_db(path: str) -> sqlite3.Connection:
@@ -89,6 +120,10 @@ def remove_empty_keys(d: Dict[str, Any]) -> Dict[str, Any]:
 
 def env_var(key: str) -> Any:
     return os.environ[key]
+
+
+def now() -> int:
+    return int(time.time())
 
 
 codec_list = [

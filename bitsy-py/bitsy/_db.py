@@ -1,4 +1,4 @@
-import sqlite3
+import operator
 
 from ._t import *
 from ._models import *
@@ -6,7 +6,7 @@ from ._config import BitsyConfig
 from ._utils import *
 from ._errors import *
 
-_logger = logging.getLogger("bitsy.db")
+logger = logging.getLogger("bitsy.db")
 
 
 class _Database:
@@ -26,6 +26,19 @@ class _Database:
         except Exception as err:
             raise DatabaseError("error committing transaction: %s", str(err))
 
+    def query(self, query: str) -> Any:
+        cursor = self._conn.cursor()
+        cursor.execute(query)
+        return cursor.fetchone()
+
+    def query_many(self, query: str) -> List[Any]:
+        cursor = self._conn.cursor()
+        cursor.execute(query)
+        return [operator.itemgetter(0)(item) for item in cursor.fetchall()]
+
+    def rollback(self):
+        self._conn.rollback()
+
     def _bootstrap(self):
         self._models = [
             AccessToken,
@@ -43,8 +56,6 @@ class _Database:
 
             for table in self._models:
                 table.create()
-
-        # self.commit()
 
     def close_conn(self):
         self._conn.close()

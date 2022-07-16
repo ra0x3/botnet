@@ -22,8 +22,8 @@ class TestColumn:
         assert column.create_fragment() == "  foo Null PRIMARY KEY,\n"
 
     def test_column_create_fragment_returns_frag_for_autoincrement(self):
-        column = Column("foo", ColumnType.Null, auto_increment=True)
-        assert column.create_fragment() == "  foo Null AUTOINCREMENT,\n"
+        column = Column("foo", ColumnType.Null, primary_key=True)
+        assert column.create_fragment() == "  foo Null PRIMARY KEY,\n"
 
     def test_can_add_foreign_key_to_column(self):
         column = Column(
@@ -41,7 +41,9 @@ class TestColumn:
 
 class TestTable:
     def setup_method(self):
-        self.conn = create_test_db("test_db.db")
+        self.conn = create_postgres_conn(
+            "bitsy", "postgres", "", "localhost", "5432"
+        )
 
     def test_can_create_basic_table(self):
         table = Table(
@@ -50,7 +52,6 @@ class TestTable:
                 Column(
                     "id",
                     ColumnType.Integer,
-                    auto_increment=True,
                     primary_key=True,
                 ),
                 Column("uuid", ColumnType.Varchar),
@@ -63,16 +64,13 @@ class TestTable:
         assert (
             stmnt
             == """CREATE TABLE IF NOT EXISTS foo (
-  id integer PRIMARY KEY AUTOINCREMENT,
+  id integer PRIMARY KEY,
   uuid varchar(255),
   bytes bytea
 );"""
         )
 
         table.create()
-
-        results = list(self.conn.execute("SELECT * FROM foo;"))
-        assert isinstance(results, list)
 
     def test_can_create_table_with_constraints(self):
         table = Table(
@@ -81,8 +79,7 @@ class TestTable:
                 Column(
                     "id",
                     ColumnType.Integer,
-                    auto_increment=True,
-                    primary_key=True,
+                    serial=True,
                 ),
                 Column("name", ColumnType.Varchar),
             ],
@@ -93,8 +90,7 @@ class TestTable:
             columns=[
                 Column(
                     "id",
-                    ColumnType.Integer,
-                    auto_increment=True,
+                    ColumnType.Serial,
                     primary_key=True,
                 ),
                 Column("uuid", ColumnType.Varchar),
@@ -114,7 +110,7 @@ class TestTable:
         assert (
             stmnt
             == """CREATE TABLE IF NOT EXISTS documents (
-  id integer PRIMARY KEY AUTOINCREMENT,
+  id serial PRIMARY KEY,
   uuid varchar(255),
   account_id integer,
   FOREIGN KEY(account_id) REFERENCES accounts(id) ON DELETE NO ACTION

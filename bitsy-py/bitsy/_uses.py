@@ -8,27 +8,32 @@ from ._utils import *
 from ._errors import *
 from ._db import database
 
-_logger = logging.getLogger("bitsy.uses")
+logger = logging.getLogger("bitsy.uses")
 
 
-def _use_case(func):
-    def __use_case(*args, **kwargs):
-        result = func(*args, **kwargs)
-        return result
+def use_case(func):
+    try:
 
-    database.commit()
+        def _use_case(*args, **kwargs):
+            result = func(*args, **kwargs)
+            return result
 
-    return __use_case
+        database.commit()
+    except DatabaseError as err:
+        logger.error(str(err))
+        database.rollback()
+
+    return _use_case
 
 
-@_use_case
+@use_case
 def create_access_token() -> AccessToken:
     token = AccessToken(uuid4())
     token.save()
     return token
 
 
-@_use_case
+@use_case
 def create_third_party() -> ThirdParty:
     party = ThirdParty(uuid4())
     party.save()
@@ -40,7 +45,56 @@ def create_access_token_for_third_party_id(party_id: str) -> AccessToken:
     return create_access_token_for_third_party(party)
 
 
-@_use_case
+@use_case
+def get_stats_for_account(account: Account) -> AccountStat:
+    query = f"""
+        SELECT 
+            EXTRACT(DAYS FROM (NOW() - TO_TIMESTAMP(created_at))) AS age FROM accounts WHERE pubkey = '{account.pubkey}'
+        UNION ALL
+            SELECT COUNT(*) AS count FROM permissions WHERE account_pubkey = '{account.pubkey}'
+    """
+
+    results = database.query_many(query)
+    return AccountStat.from_row([int(value) for value in results])
+
+
+def get_stats_for_account_id(account_pubkey: str) -> AccountStat:
+    account = Account.get(where={"pubkey": account_pubkey})
+    return get_stats_for_account(account)
+
+
+@use_case
+def add_setting_to_account(
+    account: Account, key: SettingKey, value: int
+) -> Setting:
+    setting = Setting(account.pubkey, key, value)
+    setting.save()
+    return setting
+
+
+def add_setting_to_account_id(
+    account_pubkey: str, key: SettingKey, value: int
+) -> Setting:
+    account = Account.get(where={"pubkey": account_pubkey})
+    return add_setting_to_account(account, key, value)
+
+
+@use_case
+def toggle_account_setting(account: Account, key: SettingKey) -> Setting:
+    setting = Setting.get(
+        where={"key": key.value, "account_pubkey": account.pubkey}
+    )
+    setting.toggle()
+    setting.save()
+    return setting
+
+
+def toggle_account_setting_id(account_pubkey: str, key: SettingKey) -> Setting:
+    account = Account.get(where={"pubkey": account_pubkey})
+    return toggle_account_setting(account, key)
+
+
+@use_case
 def create_access_token_for_third_party(party: ThirdParty) -> AccessToken:
     token = create_access_token()
     _ = party.update(
@@ -50,7 +104,7 @@ def create_access_token_for_third_party(party: ThirdParty) -> AccessToken:
     return token
 
 
-@_use_case
+@use_case
 def create_account(pubkey: PublicKey) -> Account:
     account = Account(key_image(pubkey.to_hex()))
     account.save()
@@ -59,14 +113,14 @@ def create_account(pubkey: PublicKey) -> Account:
     return account
 
 
-@_use_case
+@use_case
 def update_account_keys(
     prev_account_pubkey: str, new_account_pubkey: str
 ) -> Account:
     raise NotImplementedError
 
 
-@_use_case
+@use_case
 def create_document_for_account(data: str, account: Account) -> Document:
     cid = blake3_sha256(uuid4())
     bundle = fernet_bundle()
@@ -84,7 +138,7 @@ def create_document_for_account_id(account_pubkey: str, data: str) -> Document:
     return create_document_for_account(data, account)
 
 
-@_use_case
+@use_case
 def third_party_access_document_id(
     third_party_id: str, document_cid: str, account_pubkey: str
 ) -> Optional[Document]:
@@ -113,7 +167,7 @@ def third_party_access_document_id(
     if not setting:
         raise InvalidSettingError(
             "Account({}) does not have Setting({}) configured.".format(
-                account_pubkey, SettingKey.BitsyVaultDeletegation
+                account_pubkey, SettingKey.BitsyVaultDeletegation.value
             )
         )
 
@@ -125,7 +179,8 @@ def third_party_access_document_id(
         bundle.key.decrypt(encode(document.blob.data, Encoding.UTF8)),
         Encoding.UTF8,
     )
-    perm.document.set_text(plaintext)
+
+    document.set_text(plaintext)
 
     new_key_bytes = pbkdf2hmac_kdf(bundle.key_bytes)
     new_bundle = fernet_bundle(new_key_bytes)
@@ -143,7 +198,7 @@ def third_party_access_document_id(
     return update_doc
 
 
-@_use_case
+@use_case
 def grant_perms_on_new_doc_for_third_party(
     key: PermissionKey,
     party: ThirdParty,
@@ -151,10 +206,7 @@ def grant_perms_on_new_doc_for_third_party(
     account: Account,
     ttl: int,
 ) -> Permission:
-    cid = blake3_sha256(uuid4())
-
-    document = Document(cid, DocumentBlob(data), account)
-    document.save()
+    document = create_document_for_account(data, account)
     permission = Permission(
         uuid4(),
         key,
@@ -182,7 +234,7 @@ def grant_perms_on_new_doc_for_third_party_id(
     )
 
 
-@_use_case
+@use_case
 def grant_perms_on_existing_doc_for_third_party(
     key: PermissionKey,
     party: ThirdParty,
@@ -210,7 +262,39 @@ def grant_perms_on_existing_doc_for_third_party_id(
     )
 
 
-@_use_case
+@use_case
+def revoke_perms_on_existing_doc_for_third_party(
+    party: ThirdParty, document_id: str, account: Account, key: PermissionKey
+) -> Any:
+    perm = Permission.get(
+        where={
+            "document_cid": document_id,
+            "account_pubkey": account.pubkey,
+            "key": key.value,
+        }
+    )
+    if not perm:
+        raise InvalidPermissionError(
+            "Permission({}) does not exist for Party({}) on Document({}) belonging to Account({})".format(
+                key.value, party.uuid, document_id, account.pubkey
+            )
+        )
+
+    perm.delete()
+    return
+
+
+def revoke_perms_on_existing_doc_for_third_party_id(
+    party_id: str, document_id: str, account_pubkey: str, key: SettingKey
+) -> Any:
+    party = ThirdParty.get(where={"uuid": party_id})
+    account = Account.get(where={"pubkey": account_pubkey})
+    return revoke_perms_on_existing_doc_for_third_party(
+        party, document_id, account, key
+    )
+
+
+@use_case
 def new_access_token_for_third_party(party: ThirdParty) -> AccessToken:
     token = create_access_token()
     party = ThirdParty.update(
@@ -219,7 +303,7 @@ def new_access_token_for_third_party(party: ThirdParty) -> AccessToken:
     return token
 
 
-@_use_case
+@use_case
 def revoke_third_party_perms_on_account(
     key: PermissionKey, account: Account, party: ThirdParty
 ) -> Permission:
@@ -234,7 +318,7 @@ def revoke_third_party_perms_on_account(
     return perm
 
 
-@_use_case
+@use_case
 def list_all_third_party_perms_for_account(
     account: Account,
 ) -> List[Permission]:
@@ -242,11 +326,33 @@ def list_all_third_party_perms_for_account(
     return perms
 
 
-@_use_case
+@use_case
+def update_existing_doc_for_account(
+    account: Account, blob: str, document: Document
+) -> Document:
+
+    bundle = document.update_with_new_blob(blob)
+    doc = Document.update(
+        update={"blob": document.blob.data, "key_image": document.key_img},
+        where={"cid": document.cid, "account_pubkey": account.pubkey},
+    )
+    _ = keystore.put_bytes(bundle.hexkey)
+    return doc
+
+
+def update_existing_doc_for_account_id(
+    account_pubkey: str, blob: str, document_id: str
+) -> Document:
+    account = Account.get(where={"pubkey": account_pubkey})
+    document = Document.get(where={"cid": document_id})
+    return update_existing_doc_for_account(account, blob, document)
+
+
+@use_case
 def toggle_setting_for_account(account: Account) -> Setting:
     raise NotImplementedError
 
 
-@_use_case
+@use_case
 def register_new_account(privkey: PublicKey) -> Account:
     raise NotImplementedError

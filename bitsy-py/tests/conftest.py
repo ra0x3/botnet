@@ -1,11 +1,15 @@
 import random
 import string
+import os
 
 import pytest
 import eth_account
 import eth_keys
 
 from bitsy._utils import *
+
+load_dot_env()
+
 from bitsy._t import *
 from bitsy._const import web3
 from bitsy._models import Model

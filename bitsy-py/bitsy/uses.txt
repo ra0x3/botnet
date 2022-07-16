@@ -1,0 +1,24 @@
+# Account
+[x] - create account using mnemnonic
+    - get and save pubkey
+    - create document key
+[x] - account get stats
+[x] - add setting to account
+[x] - update setting on account
+[ ] - update existing document for account
+[x] - grant permission to party for document
+[x] - revoke permission to party on document
+[ ] - grant permission to party for document via notification
+    - *will require user to send an event back to bitsy
+
+# Third party
+[x] - create third party
+[x] - create access token for third party
+[x] - create new document for account
+[x] - party read access document on account
+[ ] - party write access document on account
+[ ] - party refresh access token
+
+
+
+* will require a notification service

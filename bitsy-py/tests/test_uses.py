@@ -188,3 +188,83 @@ class TestUsesCases(BaseTestClass):
         fernet = fernet_from(unhexlify(hexkey))
         plaintext = fernet.decrypt(encode(updated_doc.blob.data, Encoding.UTF8))
         assert plaintext == encode(xml_doc, Encoding.UTF8)
+
+    def test_get_stats_for_account(self, keypair, xml_doc):
+        account = create_account(keypair.pubkey)
+        party = create_third_party()
+        document = create_document_for_account(xml_doc, account)
+        _ = grant_perms_on_existing_doc_for_third_party(
+            PermissionKey.Read, party, account, document
+        )
+
+        stats = get_stats_for_account(account)
+        assert isinstance(stats, AccountStat)
+
+        assert stats.account_age == 0
+        assert stats.perm_count == 1
+
+    def test_add_setting_to_account(self, keypair):
+        account = create_account(keypair.pubkey)
+        setting = add_setting_to_account(account, SettingKey.Other, 1)
+        assert isinstance(setting, Setting)
+        assert setting.access_token is None
+        assert setting.account_pubkey == account.pubkey
+
+        results = self.get_from_db(
+            f"SELECT * FROM settings WHERE account_pubkey = '{account.pubkey}'"
+        )
+        get_setting = Setting.from_row(results[0])
+
+        assert get_setting.enabled()
+
+    def test_toggle_account_setting(self, keypair):
+        account = create_account(keypair.pubkey)
+        setting = add_setting_to_account(account, SettingKey.Other, 1)
+        assert setting.enabled()
+
+        updated_setting = toggle_account_setting(account, SettingKey.Other)
+        assert updated_setting.disabled()
+
+    def test_revoke_perms_on_existing_doc_for_third_party(
+        self, keypair, xml_doc
+    ):
+        account = create_account(keypair.pubkey)
+        party = create_third_party()
+        document = create_document_for_account(xml_doc, account)
+        perm = grant_perms_on_existing_doc_for_third_party(
+            PermissionKey.Read, party, account, document
+        )
+
+        get_perm = self.get_from_db(
+            f"SELECT * FROM permissions WHERE uuid = '{perm.uuid}';"
+        )
+        assert get_perm is not None
+
+        revoke_perms_on_existing_doc_for_third_party(
+            party, document.cid, account, perm.key
+        )
+
+        get_perm = self.get_from_db(
+            f"SELECT * FROM permissions WHERE uuid = '{perm.uuid}';"
+        )
+        assert not get_perm
+
+    def test_update_existing_doc_for_account(self, keypair, xml_doc):
+        account = create_account(keypair.pubkey)
+        document = create_document_for_account(xml_doc, account)
+
+        new_blob = "Hello, world!"[::-1]
+        updated_doc = update_existing_doc_for_account(
+            account, new_blob, document
+        )
+
+        assert isinstance(updated_doc, Document)
+        # .update_with_new_blob() updates original key_img pointer
+        assert updated_doc.key_img == document.key_img
+
+        hexkey = keystore.get_bytes(updated_doc.key_img)
+        assert isinstance(hexkey, bytes)
+
+        fernet = fernet_from(unhexlify(hexkey))
+        plaintext = fernet.decrypt(encode(updated_doc.blob.data, Encoding.UTF8))
+        assert plaintext == encode(new_blob, Encoding.UTF8)

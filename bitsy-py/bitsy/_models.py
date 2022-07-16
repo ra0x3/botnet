@@ -6,11 +6,12 @@ import logging
 from ._t import *
 from ._utils import *
 from ._config import BitsyConfig
+from ._const import SQL_NULL
+from ._errors import *
+from ._crypto import fernet_bundle, FernetBundle
 
-_SQL_NULL = "null"
 
-
-_logger = logging.getLogger("bitsy.models")
+logger = logging.getLogger("bitsy.models")
 
 
 class _table_name(enum.Enum):
@@ -23,15 +24,15 @@ class _table_name(enum.Enum):
 
 
 class SettingKey(enum.Enum):
-    Other = "other"
-    BitsyVaultDeletegation = "bitsy.vault.delegation"
+    Other = "Other"
+    BitsyVaultDeletegation = "BitsyVaultDeletegation"
 
 
 class PermissionKey(enum.Enum):
-    Other = "other"
-    Read = "read"
-    Write = "write"
-    Delete = "delete"
+    Other = "Other"
+    Read = "Read"
+    Write = "Write"
+    Delete = "Delete"
 
 
 class ColumnType(enum.Enum):
@@ -41,6 +42,7 @@ class ColumnType(enum.Enum):
     Bytea = "bytea"
     Null = "Null"
     ForeignKey = "ForeignKey"
+    Serial = "serial"
 
 
 class _DeleteAction(enum.Enum):
@@ -96,19 +98,21 @@ class Column:
         self,
         name: str,
         type: ColumnType,
-        auto_increment: bool = False,
+        serial: bool = False,
         primary_key: bool = False,
         unique: Optional[bool] = False,
         foreign_key: Optional[ForeignKey] = None,
         default: Optional[str] = None,
+        null: Optional[bool] = None,
     ):
         self.name = name
         self.type = type
-        self.auto_increment = auto_increment
+        self.serial = serial
         self.primary_key = primary_key
         self.unique = unique
         self.foreign_key = foreign_key
         self.default = default
+        self.null = null
 
     def create_fragment(self) -> str:
         frag = f"  {self.name} {self.type.value}"
@@ -117,7 +121,7 @@ class Column:
             assert not (
                 self.unique
                 and not self.primary_key
-                and not self.auto_increment
+                and not self.serial
                 and not self.default
             ), "Cannot have a FK and other constraints"
 
@@ -127,11 +131,11 @@ class Column:
         if self.primary_key:
             frag += " PRIMARY KEY"
 
-        if self.auto_increment:
-            frag += " AUTOINCREMENT"
-
         if self.default:
             frag += f" DEFAULT {self.default}"
+
+        if self.null:
+            frag += " "
 
         frag += ",\n"
 
@@ -163,7 +167,7 @@ class Table:
         return stmnt
 
     def create(self):
-        _logger.debug("creating table(%s)", self.name)
+        logger.debug("creating table(%s)", self.name)
         cursor = self.conn.cursor()
         stmnt = self._create_stmnt()
         cursor.execute(stmnt)
@@ -222,6 +226,10 @@ class ModelEntry:
 
     @abc.abstractstaticmethod
     def from_row(row: Tuple[Any]):
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def delete(self):
         raise NotImplementedError
 
 
@@ -287,6 +295,11 @@ class BaseModel(ModelEntry):
         cursor.execute(stmnt)
 
         result = cursor.fetchone()
+
+        # Can't throw an error here, maybe on a .get_by_id()
+        # if not result:
+        #     raise ResourceDoesNotExist("No resource found for clause: {}".format(where))
+
         return cls.from_row(result)
 
     @classmethod
@@ -317,7 +330,9 @@ class AccessToken(BaseModel):
         conn=BitsyConfig.conn,
     )
 
-    def __init__(self, uuid: str = _SQL_NULL, expiry: int = -1):
+    def __init__(
+        self, uuid: str = SQL_NULL, expiry: int = defaults.access_token_ttl
+    ):
         self.uuid = uuid
         self.expiry = expiry
 
@@ -333,7 +348,7 @@ class AccessToken(BaseModel):
         AccessToken.table.create()
 
     def is_null(self) -> bool:
-        return self.uuid == _SQL_NULL or self.uuid is None
+        return self.uuid == SQL_NULL or self.uuid is None
 
     def is_expired(self) -> bool:
         return self.expiry > int(time.time())
@@ -363,7 +378,7 @@ class ThirdParty(BaseModel):
     def to_row(self) -> Tuple[Any]:
         if self.access_token:
             return (quote(self.uuid), quote(self.access_token.uuid))
-        return (quote(self.uuid), _SQL_NULL)
+        return (quote(self.uuid), SQL_NULL)
 
     def from_row(row: Tuple[Any]) -> "ThirdParty":
         row = tuple([item for item in row if item])
@@ -477,23 +492,32 @@ class Permission(BaseModel):
     def create():
         Permission.table.create()
 
+    def delete(self):
+        stmtnt = f"DELETE FROM {self.table.name} WHERE uuid = '{self.uuid}';"
+        cursor = self.table.conn.cursor()
+        cursor.execute(stmtnt)
+
 
 class Account(BaseModel):
     table = Table(
         _table_name.accounts.value,
-        columns=[Column("pubkey", ColumnType.Varchar, unique=True)],
+        columns=[
+            Column("pubkey", ColumnType.Varchar, unique=True),
+            Column("created_at", ColumnType.Integer),
+        ],
         conn=BitsyConfig.conn,
     )
 
-    def __init__(self, pubkey: str):
+    def __init__(self, pubkey: str, created_at: int = now()):
         self.pubkey = pubkey
+        self.created_at = created_at
 
     def to_row(self) -> Tuple[Any]:
-        return (quote(self.pubkey),)
+        return (quote(self.pubkey), quote(self.created_at))
 
     def from_row(row: Tuple[Any]) -> "Account":
-        (pubkey,) = row
-        return Account(pubkey)
+        (pubkey, created_at) = row
+        return Account(pubkey, created_at)
 
     @staticmethod
     def create():
@@ -508,6 +532,16 @@ class Account(BaseModel):
                 access_token.save()
                 setting.access_token = access_token
             setting.save()
+
+
+class AccountStat:
+    def __init__(self, account_age: int, perm_count: int):
+        self.account_age = account_age
+        self.perm_count = perm_count
+
+    def from_row(row: Tuple[Any]) -> "AccountStat":
+        (account_age, perm_count) = row
+        return AccountStat(account_age, perm_count)
 
 
 class Document(BaseModel):
@@ -534,7 +568,7 @@ class Document(BaseModel):
         cid: str,
         blob: DocumentBlob,
         account: Account,
-        key_img: str = _SQL_NULL,
+        key_img: str = SQL_NULL,
     ):
         self.cid = cid
         self.blob = blob
@@ -565,6 +599,15 @@ class Document(BaseModel):
     def set_text(self, text: str):
         self.blob = DocumentBlob(text)
 
+    def update_with_new_blob(self, blob: str) -> FernetBundle:
+        bundle = fernet_bundle()
+        ciphertext = decode(
+            bundle.key.encrypt(encode(blob, Encoding.UTF8)), Encoding.UTF8
+        )
+        self.key_img = bundle.key_img
+        self.blob = DocumentBlob(ciphertext)
+        return bundle
+
 
 class Setting(BaseModel):
     table = Table(
@@ -587,6 +630,7 @@ class Setting(BaseModel):
                     "access_token",
                     reference=ForeignKeyReference("access_tokens", "uuid"),
                 ),
+                null=True,
             ),
         ],
         conn=BitsyConfig.conn,
@@ -607,9 +651,10 @@ class Setting(BaseModel):
     def to_row(self) -> Tuple[Any]:
         token = (
             quote(self.access_token.uuid)
-            if self.access_token is not None
-            else quote(None)
+            if not is_nullish(self.access_token)
+            else SQL_NULL
         )
+
         return (
             quote(self.account_pubkey),
             quote(self.key.value),
@@ -619,9 +664,19 @@ class Setting(BaseModel):
 
     def from_row(row: Tuple[Any]) -> "Setting":
         (account_pubkey, key, value, access_token) = row
-        return Setting(
-            account_pubkey, SettingKey(key), value, AccessToken(access_token)
+        access_token = (
+            AccessToken(access_token) if not is_nullish(access_token) else None
         )
+        return Setting(account_pubkey, SettingKey(key), value, access_token)
+
+    def enabled(self) -> bool:
+        return self.value == 1
+
+    def disabled(self) -> bool:
+        return not self.enabled()
+
+    def toggle(self):
+        self.value = 0 if self.value == 1 else 1
 
     @staticmethod
     def create():
