@@ -1,10 +1,12 @@
 import sqlite3
 import pathlib
+import sys
 import os
 import time
 import enum
 import uuid
 import codecs
+import json
 import binascii
 import psycopg2
 from dotenv import load_dotenv
@@ -13,6 +15,18 @@ from blake3 import blake3
 from ._const import SQL_NULL
 
 from ._t import *
+
+
+def str_bool_to_int(s: Union[str, bool], t: Union[str, bool]) -> int:
+    return 1 if s == t else 0
+
+
+def env_var(key: str) -> Any:
+    return os.environ[key]
+
+
+def is_pytest_session() -> bool:
+    return "pytest" in sys.modules
 
 
 def is_nullish(value: Any) -> bool:
@@ -39,23 +53,20 @@ def load_dot_env():
     load_dotenv(env_path)
 
 
-class defaults:
-    access_token_ttl: int = 60 * 60 * 24
-
-
-def create_test_db(path: str) -> sqlite3.Connection:
-    conn = sqlite3.connect(path, check_same_thread=False, timeout=5)
-    # curr = conn.execute("PRAGMA locking_mode = EXCLUSIVE")
-    os.chmod(path, 0o777)
-    return conn
-
-
 def create_postgres_conn(
     database: str, user: str, password: str, host: str, port: str
 ):
     return psycopg2.connect(
         database=database, user=user, password=password, host=host, port=port
     )
+
+
+def encode_json(d: Dict[str, Any]) -> str:
+    return json.dumps(d)
+
+
+def decode_json(s: str) -> Dict[str, Any]:
+    return json.loads(s)
 
 
 def remove_file(paths: List[str]):
@@ -69,7 +80,7 @@ def remove_file(paths: List[str]):
 
 
 # FIXME: Obviously this is a no-no
-def blake3_sha256(input: Union[str, bytes]) -> str:
+def blake3_(input: Union[str, bytes]) -> str:
     digest: str
     if isinstance(input, str):
         digest: str = blake3(input.encode()).hexdigest()
@@ -116,10 +127,6 @@ def unhexlify(s: str) -> bytes:
 
 def remove_empty_keys(d: Dict[str, Any]) -> Dict[str, Any]:
     return {key: value for key, value in d.items() if value}
-
-
-def env_var(key: str) -> Any:
-    return os.environ[key]
 
 
 def now() -> int:

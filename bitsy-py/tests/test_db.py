@@ -6,10 +6,7 @@ from bitsy._utils import *
 class TestIndex:
     def test_index_create_fragment_returns_proper_fragment(self):
         index = Index("bar", unique=True, table_name="foo", column_name="baz")
-        assert (
-            index.create_fragment()
-            == "CREATE UNIQUE INDEX IF NOT EXISTS bar ON foo(baz)"
-        )
+        assert index.create_fragment() == "CREATE UNIQUE INDEX IF NOT EXISTS bar ON foo(baz)"
 
 
 class TestColumn:
@@ -29,9 +26,7 @@ class TestColumn:
         column = Column(
             "foo",
             ColumnType.Integer,
-            foreign_key=ForeignKey(
-                "foo", reference=ForeignKeyReference("bar", "id")
-            ),
+            foreign_key=ForeignKey("foo", reference=ForeignKeyReference("bar", "id")),
         )
         assert (
             column.create_fragment()
@@ -41,9 +36,7 @@ class TestColumn:
 
 class TestTable:
     def setup_method(self):
-        self.conn = create_postgres_conn(
-            "bitsy", "postgres", "", "localhost", "5432"
-        )
+        self.conn = create_postgres_conn("bitsy", "postgres", "", "localhost", "5432")
 
     def test_can_create_basic_table(self):
         table = Table(
@@ -74,7 +67,7 @@ class TestTable:
 
     def test_can_create_table_with_constraints(self):
         table = Table(
-            "accounts",
+            "fools",
             columns=[
                 Column(
                     "id",
@@ -86,7 +79,7 @@ class TestTable:
             conn=self.conn,
         )
         docs = Table(
-            "documents",
+            "zeros",
             columns=[
                 Column(
                     "id",
@@ -95,11 +88,11 @@ class TestTable:
                 ),
                 Column("uuid", ColumnType.Varchar),
                 Column(
-                    "account_id",
+                    "fool_id",
                     ColumnType.Integer,
                     foreign_key=ForeignKey(
-                        "account_id",
-                        reference=ForeignKeyReference("accounts", "id"),
+                        "fool_id",
+                        reference=ForeignKeyReference("fools", "id"),
                     ),
                 ),
             ],
@@ -109,11 +102,11 @@ class TestTable:
         stmnt = docs._create_stmnt()
         assert (
             stmnt
-            == """CREATE TABLE IF NOT EXISTS documents (
+            == """CREATE TABLE IF NOT EXISTS zeros (
   id serial PRIMARY KEY,
   uuid varchar(255),
-  account_id integer,
-  FOREIGN KEY(account_id) REFERENCES accounts(id) ON DELETE NO ACTION
+  fool_id integer,
+  FOREIGN KEY(fool_id) REFERENCES fools(id) ON DELETE NO ACTION
 );"""
         )
 

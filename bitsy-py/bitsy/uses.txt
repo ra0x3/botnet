@@ -1,5 +1,5 @@
 # Account
-[x] - create account using mnemnonic
+[x] - create account using mnemonic
     - get and save pubkey
     - create document key
 [x] - account get stats

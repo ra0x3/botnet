@@ -14,9 +14,17 @@ from ._utils import *
 from ._t import *
 
 
+class PublicKey(eth_keys.keys.PublicKey):
+    pass
+
+
+class PrivateKey(eth_keys.keys.PrivateKey):
+    pass
+
+
 # FIXME: Obviously this is a no-no
 def key_image(key: Union[str, bytes]) -> str:
-    return blake3_sha256(key)
+    return blake3_(key)
 
 
 def salt(n: int = 16) -> bytes:
@@ -62,26 +70,24 @@ def fernet_bytes() -> bytes:
     return Fernet.generate_key()
 
 
-class PublicKey(eth_keys.keys.PublicKey):
-    pass
-
-
-class PrivateKey(eth_keys.keys.PrivateKey):
-    pass
+def recover_pubkey_from_compressed_hex(hex: str) -> PublicKey:
+    return eth_keys.keys.PublicKey.from_compressed_bytes(unhexlify(hex[2:]))
 
 
 class Keypair:
     def __init__(self, privkey: PrivateKey, pubkey: PublicKey):
         self.privkey = privkey
         self.pubkey = pubkey
+        self.address = self.pubkey.to_checksum_address()
 
 
-def eth_account_from_mnemnonic(m: str) -> eth_account.Account:
+def eth_account_from_mnemonic(m: str) -> eth_account.Account:
+    # https://www.reddit.com/r/seedstorage/comments/voixjj/comment/iedodmv/?utm_source=share&utm_medium=web2x&context=3
     return web3.eth.account.from_mnemonic(m, account_path="m/44'/60'/0'/0/0")
 
 
-def mnemnonic_to_pubkey(m: str) -> PublicKey:
-    acct = eth_account_from_mnemnonic(m)
+def mnemonic_to_pubkey(m: str) -> Tuple[str, PublicKey]:
+    acct = eth_account_from_mnemonic(m)
     privkey = eth_keys.keys.PrivateKey(acct._private_key)
     return privkey.public_key
 

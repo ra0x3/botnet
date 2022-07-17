@@ -1,7 +1,9 @@
 import yaml
 import enum
+import datetime as dt
 import os
 import json
+import jwt
 
 from ._t import *
 from ._utils import *
@@ -19,9 +21,22 @@ class _LogLevel(enum.Enum):
     ERROR = "ERROR"
 
 
+def derive_jwt(params: Dict[str, str]):
+    expiry = dt.datetime.now() + dt.timedelta(
+        days=int(BitsyConfig.jwt_expiry_days)
+    )
+    params["exp"] = int(expiry.strftime("%s"))
+    return jwt.encode(
+        params, BitsyConfig.jwt_secret, algorithm=BitsyConfig.jwt_algo
+    )
+
+
 class BitsyConfig:
 
-    db_path: str = "bitsy.db"
+    jwt_secret: str = env_var("JWT_SECRET")
+
+    jwt_algo: str = "HS256"
+    jwt_expiry_days: str = "90"
 
     api_host: str = "127.0.0.1"
 
@@ -45,9 +60,11 @@ class BitsyConfig:
 
     log_file: str = "bitsy.log"
 
-    conn = create_postgres_conn(
+    connection = create_postgres_conn(
         pg_database, pg_user, pg_password, pg_host, pg_port
     )
+
+    jwt_secret: str = "foo"
 
     keystore_provider: KeyStoreProvider = KeyStoreProvider.Vault.value
 

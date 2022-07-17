@@ -61,6 +61,8 @@ def _setup_logging():
 
 _app.include_router(graphql_app, prefix="/graphql")
 
+logger.info(config)
+
 
 server = Server(
     Config(
@@ -69,7 +71,8 @@ server = Server(
         port=config.api_port,
         log_level=_LOG_LEVEL,
         workers=config.workers,
-        reload=config.env == Environment.Development.value,
+        # reload=config.env == Environment.Development.value,
+        reload=True,
         use_colors=True,
         timeout_keep_alive=5,
         log_config={

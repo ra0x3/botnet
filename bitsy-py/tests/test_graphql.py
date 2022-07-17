@@ -11,23 +11,22 @@ from .utils import double_quote
 class TestGraphQLApi(BaseTestClass):
     def setup_method(self):
         self.client = TestClient(_app)
-        self.conn = self.setup_method_models()
+        self.conn = BitsyConfig.connection
 
     def test_field_hello(self):
-        response = self.client.post(
-            "/graphql", json={"query": "query { hello }"}
-        )
+        response = self.client.post("/graphql", json={"query": "query { hello }"})
         assert response.status_code == status.HTTP_200_OK
         assert response.json() == {"data": {"hello": "Hello World"}}
 
     def test_access_token(self):
-        token = create_access_token()
+        party = create_third_party("test")
+        token = create_access_token(party)
         response = self.client.post(
             "/graphql",
             json={
                 "query": "query { access_token(uuid: "
                 + double_quote(token.uuid)
-                + ") { uuid } }"
+                + ") { uuid name expiry } }"
             },
         )
         assert response.status_code == status.HTTP_200_OK
@@ -42,27 +41,27 @@ class TestGraphQLApi(BaseTestClass):
             json={
                 "query": "query { third_party(uuid: "
                 + double_quote(party.uuid)
-                + ") { uuid access_token { uuid } } }"
+                + ") { uuid name }}"
             },
         )
 
         data = response.json()["data"]["third_party"]
         assert data["uuid"] == party.uuid
-        assert data["access_token"]["uuid"] == token.uuid
+        assert data["name"] == party.name
 
     def test_account(self, keypair):
         account = create_account(keypair.pubkey)
         response = self.client.post(
             "/graphql",
             json={
-                "query": "query { account(pubkey: "
-                + double_quote(account.pubkey)
-                + ") { pubkey }}"
+                "query": "query { account(address: "
+                + double_quote(account.address)
+                + ") { pubkey address }}"
             },
         )
 
         data = response.json()["data"]["account"]
-        assert data["pubkey"] == account.pubkey
+        assert data["address"] == account.address
 
     def test_document(self, keypair, xml_doc):
         account = create_account(keypair.pubkey)
@@ -72,7 +71,7 @@ class TestGraphQLApi(BaseTestClass):
             json={
                 "query": "query { document(cid: "
                 + double_quote(document.cid)
-                + ") { cid blob { data } account { pubkey } }}"
+                + ") { cid blob { data } account { pubkey address created_at nonce } }}"
             },
         )
 
@@ -82,9 +81,7 @@ class TestGraphQLApi(BaseTestClass):
         ciphertext = data["blob"]["data"]
         hexkey = keystore.get_bytes(document.key_img)
         fernet = fernet_from(unhexlify(hexkey))
-        assert fernet.decrypt(encode(ciphertext, Encoding.UTF8)) == encode(
-            xml_doc, Encoding.UTF8
-        )
+        assert fernet.decrypt(encode(ciphertext, Encoding.UTF8)) == encode(xml_doc, Encoding.UTF8)
 
     def test_permission(self, keypair, xml_doc):
         account = create_account(keypair.pubkey)
@@ -99,7 +96,7 @@ class TestGraphQLApi(BaseTestClass):
             json={
                 "query": "query { permission(uuid: "
                 + double_quote(perm.uuid)
-                + ") { uuid key document { cid blob { data } account { pubkey } } value account { pubkey } }}"
+                + ") { uuid key document { cid blob { data } account { pubkey address } } value account { pubkey } }}"
             },
         )
 

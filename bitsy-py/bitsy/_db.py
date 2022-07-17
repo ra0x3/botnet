@@ -1,7 +1,8 @@
 import operator
+import logging
 
-from ._t import *
 from ._models import *
+from ._t import *
 from ._config import BitsyConfig
 from ._utils import *
 from ._errors import *
@@ -12,7 +13,7 @@ logger = logging.getLogger("bitsy.db")
 class _Database:
     def __init__(self):
         self.config: BitsyConfig = BitsyConfig.from_default_manifest()
-        self._conn = self.config.conn
+        self._conn = self.config.connection
         self._models: List[Model] = []
         self._models_map: Dict[str, Model] = {}
         self._init()
@@ -40,16 +41,20 @@ class _Database:
         self._conn.rollback()
 
     def _bootstrap(self):
+        from ._models import Model
+
         self._models = [
-            AccessToken,
             ThirdParty,
+            AccessToken,
             Account,
             Document,
             Permission,
             Setting,
+            Webhook,
+            ThirdPartyAccount,
         ]
 
-        with self._conn.cursor() as cursor:
+        with self._conn.cursor() as _:
             self._models_map = dict(
                 [(model.table.name, model) for model in self._models]
             )

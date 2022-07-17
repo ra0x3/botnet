@@ -3,76 +3,51 @@ from bitsy._uses import *
 from bitsy._utils import *
 from bitsy._models import *
 from bitsy._crypto import *
+from bitsy._config import BitsyConfig
 
 from .conftest import *
 
 
 class TestUsesCases(BaseTestClass):
     def setup_method(self):
-        self.conn = self.setup_method_models()
+        self.conn = BitsyConfig.connection
 
-    def test_can_create_store_get_access_token(self):
-        token = create_access_token()
+    def test_can_create_store_get_access_token(self, keypair):
+        party = create_third_party("foo")
+        token = create_access_token(party)
         assert isinstance(token, AccessToken)
 
-        result = self.get_from_db(
-            f"SELECT * FROM access_tokens WHERE uuid = '{token.uuid}';"
-        )
+        result = self.get_from_db(f"SELECT * FROM access_tokens WHERE uuid = '{token.uuid}';")
         assert len(result) >= 1
 
         get_token = AccessToken.from_row(result[0])
         assert get_token.uuid == token.uuid
-
-    def test_can_create_store_get_third_party_without_token(self):
-        party = create_third_party()
-        assert isinstance(party, ThirdParty)
-
-        result = self.get_from_db(
-            f"SELECT * FROM third_parties WHERE uuid = '{party.uuid}';"
-        )
-        assert len(result) == 1
-
-        get_party = ThirdParty.from_row(result[0])
-        assert not get_party.access_token
-        assert get_party.uuid == party.uuid
 
     def test_can_create_store_get_account(self, keypair):
         keys = keypair
         account = create_account(keys.pubkey)
         assert isinstance(account, Account)
 
-        result = self.get_from_db(
-            f"SELECT * FROM accounts WHERE pubkey = '{account.pubkey}';"
-        )
+        result = self.get_from_db(f"SELECT * FROM accounts WHERE address = '{account.address}';")
         assert len(result) == 1
 
         get_account = Account.from_row(result[0])
-        assert account.pubkey == get_account.pubkey
+        assert account.address == get_account.address
 
         response = keystore.get_key(account.pubkey)
         assert response == keys.pubkey.to_hex()
 
         result = self.get_from_db(
-            f"SELECT * FROM settings WHERE key = '{SettingKey.BitsyVaultDeletegation.value}' AND account_pubkey = '{account.pubkey}';"
+            f"SELECT * FROM settings WHERE key = '{SettingKey.BitsyVaultDeletegation.value}' AND account_address = '{account.address}';"
         )
         assert len(result) == 1
-        get_setting = Setting.from_row(result[0])
-
-        result = self.get_from_db(
-            f"SELECT * FROM access_tokens WHERE uuid = '{get_setting.access_token.uuid}';"
-        )
-        assert len(result) == 1
-
-        get_account = AccessToken.from_row(result[0])
 
     def test_can_create_store_get_document(self, xml_doc, keypair):
         account = create_account(keypair.pubkey)
         doc = create_document_for_account(xml_doc, account)
         assert isinstance(doc, Document)
 
-        result = self.get_from_db(
-            f"SELECT * FROM documents WHERE cid = '{doc.cid}';"
-        )
+        result = self.get_from_db(f"SELECT * FROM documents WHERE cid = '{doc.cid}';")
         assert len(result) == 1
 
         get_doc = Document.from_row(result[0])
@@ -109,9 +84,7 @@ class TestUsesCases(BaseTestClass):
             PermissionKey.Other, party, doc.blob.data, account, 12
         )
 
-        perm = grant_perms_on_existing_doc_for_third_party(
-            PermissionKey.Other, party, account, doc
-        )
+        perm = grant_perms_on_existing_doc_for_third_party(PermissionKey.Other, party, account, doc)
         assert isinstance(perm, Permission)
 
         result = self.get_from_db(
@@ -130,10 +103,10 @@ class TestUsesCases(BaseTestClass):
         assert token.uuid != result.uuid
 
         result = self.get_from_db(
-            f"SELECT * FROM third_parties WHERE access_token = '{result.uuid}';"
+            f"SELECT * FROM access_tokens WHERE third_party_id = '{result.third_party.uuid}';"
         )
 
-        assert len(result) == 1
+        assert len(result) >= 1
 
     def test_revoke_third_party_perms_on_account(self, keypair):
         account = create_account(keypair.pubkey)
@@ -143,9 +116,7 @@ class TestUsesCases(BaseTestClass):
             PermissionKey.Other, party, "hello world", account, 12
         )
 
-        updated_perm = revoke_third_party_perms_on_account(
-            PermissionKey.Other, account, party
-        )
+        updated_perm = revoke_third_party_perms_on_account(PermissionKey.Other, account, party)
 
         assert updated_perm.value == 0
         assert updated_perm.value != perm.value
@@ -178,9 +149,7 @@ class TestUsesCases(BaseTestClass):
         _ = grant_perms_on_existing_doc_for_third_party(
             PermissionKey.Read, party, account, document
         )
-        updated_doc = third_party_access_document_id(
-            party.uuid, document.cid, account.pubkey
-        )
+        updated_doc = third_party_access_document_id(party.uuid, document.cid, account.address)
 
         hexkey = keystore.get_bytes(updated_doc.key_img)
         assert isinstance(hexkey, bytes)
@@ -207,11 +176,10 @@ class TestUsesCases(BaseTestClass):
         account = create_account(keypair.pubkey)
         setting = add_setting_to_account(account, SettingKey.Other, 1)
         assert isinstance(setting, Setting)
-        assert setting.access_token is None
-        assert setting.account_pubkey == account.pubkey
+        assert setting.account.address == account.address
 
         results = self.get_from_db(
-            f"SELECT * FROM settings WHERE account_pubkey = '{account.pubkey}'"
+            f"SELECT * FROM settings WHERE account_address = '{account.address}'"
         )
         get_setting = Setting.from_row(results[0])
 
@@ -225,9 +193,7 @@ class TestUsesCases(BaseTestClass):
         updated_setting = toggle_account_setting(account, SettingKey.Other)
         assert updated_setting.disabled()
 
-    def test_revoke_perms_on_existing_doc_for_third_party(
-        self, keypair, xml_doc
-    ):
+    def test_revoke_perms_on_existing_doc_for_third_party(self, keypair, xml_doc):
         account = create_account(keypair.pubkey)
         party = create_third_party()
         document = create_document_for_account(xml_doc, account)
@@ -235,18 +201,12 @@ class TestUsesCases(BaseTestClass):
             PermissionKey.Read, party, account, document
         )
 
-        get_perm = self.get_from_db(
-            f"SELECT * FROM permissions WHERE uuid = '{perm.uuid}';"
-        )
+        get_perm = self.get_from_db(f"SELECT * FROM permissions WHERE uuid = '{perm.uuid}';")
         assert get_perm is not None
 
-        revoke_perms_on_existing_doc_for_third_party(
-            party, document.cid, account, perm.key
-        )
+        revoke_perms_on_existing_doc_for_third_party(party, document.cid, account, perm.key)
 
-        get_perm = self.get_from_db(
-            f"SELECT * FROM permissions WHERE uuid = '{perm.uuid}';"
-        )
+        get_perm = self.get_from_db(f"SELECT * FROM permissions WHERE uuid = '{perm.uuid}';")
         assert not get_perm
 
     def test_update_existing_doc_for_account(self, keypair, xml_doc):
@@ -254,9 +214,7 @@ class TestUsesCases(BaseTestClass):
         document = create_document_for_account(xml_doc, account)
 
         new_blob = "Hello, world!"[::-1]
-        updated_doc = update_existing_doc_for_account(
-            account, new_blob, document
-        )
+        updated_doc = update_existing_doc_for_account(account, new_blob, document)
 
         assert isinstance(updated_doc, Document)
         # .update_with_new_blob() updates original key_img pointer
@@ -268,3 +226,24 @@ class TestUsesCases(BaseTestClass):
         fernet = fernet_from(unhexlify(hexkey))
         plaintext = fernet.decrypt(encode(updated_doc.blob.data, Encoding.UTF8))
         assert plaintext == encode(new_blob, Encoding.UTF8)
+
+    def test_create_third_party_webhook(self):
+        party = create_third_party()
+        hook = create_third_party_webhook(party, "/foo/bar", WebhookType.Incoming, "foobar", 0)
+        assert isinstance(hook, Webhook)
+
+        results = self.get_from_db(f"SELECT * FROM webhooks WHERE uuid = '{hook.uuid}';")
+        get_webhook = Webhook.from_row(results[0])
+        assert not get_webhook.active
+
+    def test_create_third_party_account(self, keypair):
+        party_acct = create_third_party_account(keypair.pubkey)
+        assert isinstance(party_acct, ThirdPartyAccount)
+
+        result = self.get_from_db(
+            f"SELECT * FROM third_party_accounts WHERE account_address = '{party_acct.account.address}';"
+        )
+        get_account = ThirdPartyAccount.from_row(result[0])
+
+        assert isinstance(get_account.party, ThirdParty)
+        assert isinstance(get_account.account, Account)

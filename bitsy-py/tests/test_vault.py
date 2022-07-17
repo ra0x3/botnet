@@ -13,9 +13,7 @@ db_path = "test_vault.db"
 
 class TestVault(BaseTestClass):
     def setup_method(self):
-        self.store = KeyStore_(
-            BitsyConfig(keystore_provider=KeyStoreProvider.Vault.value)
-        )
+        self.store = KeyStore_(BitsyConfig(keystore_provider=KeyStoreProvider.Vault.value))
 
     def test_basic_set_and_get(self, keypair):
         pubkey = keypair.pubkey

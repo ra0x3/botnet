@@ -17,6 +17,11 @@ hvac = "*"
 eth-tester = "*"
 loguru = "*"
 psycopg2 = "*"
+python-slugify = "*"
+pyjwt = "*"
+# sha3 = "*"
+coincurve = "*"
+pysha3 = "*"
 
 [dev-packages]
 black = "*"

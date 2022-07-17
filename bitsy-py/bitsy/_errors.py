@@ -2,6 +2,10 @@ class _BitsyError(Exception):
     pass
 
 
+class RequestError(Exception):
+    pass
+
+
 class InvalidPermissionError(_BitsyError):
     pass
 

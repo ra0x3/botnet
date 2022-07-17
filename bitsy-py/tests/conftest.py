@@ -22,26 +22,7 @@ from .utils import *
 config = BitsyConfig.from_default_manifest()
 
 
-def create_test_db_and_bootstrap_tables(models: List[Model]):
-    for model in models:
-        model.table.conn = config.conn
-        model.create()
-    return config.conn
-
-
 class BaseTestClass:
-    def setup_method_models(self):
-        return create_test_db_and_bootstrap_tables(
-            models=[
-                Model.AccessToken,
-                Model.ThirdParty,
-                Model.Account,
-                Model.Document,
-                Model.Permission,
-                Model.Setting,
-            ],
-        )
-
     def get_from_db(self, query):
         cursor = self.conn.cursor()
         cursor.execute(query)
@@ -84,5 +65,5 @@ def keypair() -> Keypair:
 
 
 @pytest.fixture
-def mnemnonic() -> str:
-    return RealMetamaskAcct.mnemnonic
+def mnemonic() -> str:
+    return RealMetamaskAcct.mnemonic

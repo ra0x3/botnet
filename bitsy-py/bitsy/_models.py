@@ -1,14 +1,15 @@
 import abc
 import enum
 import time
+import datetime as dt
 import logging
 
 from ._t import *
 from ._utils import *
-from ._config import BitsyConfig
 from ._const import SQL_NULL
 from ._errors import *
 from ._crypto import fernet_bundle, FernetBundle
+from ._config import BitsyConfig
 
 
 logger = logging.getLogger("bitsy.models")
@@ -21,11 +22,17 @@ class _table_name(enum.Enum):
     accounts = "accounts"
     documents = "documents"
     settings = "settings"
+    webhooks = "webhooks"
+    third_party_accounts = "third_party_accounts"
 
 
 class SettingKey(enum.Enum):
     Other = "Other"
     BitsyVaultDeletegation = "BitsyVaultDeletegation"
+    ProgrammaticThirdPartyAccess = "ProgrammaticThirdPartyAccess"
+    ThirdPartyNotifications = "ThirdPartyNotifications"
+    Webhooks = "Webhooks"
+    ProgrammaticWebhookAccess = "ProgrammaticWebhookAccess"
 
 
 class PermissionKey(enum.Enum):
@@ -228,10 +235,6 @@ class ModelEntry:
     def from_row(row: Tuple[Any]):
         raise NotImplementedError
 
-    @abc.abstractmethod
-    def delete(self):
-        raise NotImplementedError
-
 
 class BaseModel(ModelEntry):
     table: Table
@@ -240,7 +243,6 @@ class BaseModel(ModelEntry):
         columns_frag = ", ".join([column.name for column in self.table.columns])
         values_frag = ", ".join(self.to_row())
         stmnt = f"INSERT INTO {self.table.name} ({columns_frag}) VALUES ({values_frag});"
-
         cursor = self.table.conn.cursor()
         cursor.execute(stmnt)
 
@@ -281,7 +283,13 @@ class BaseModel(ModelEntry):
         return cls.from_row(result)
 
     @classmethod
-    def get(cls, where: Dict[str, Any]) -> Any:
+    def get(
+        cls,
+        where: Dict[str, Any],
+        fail_if_not_found: bool = False,
+        return_null: bool = True,
+    ) -> Any:
+
         stmnt = f"SELECT * FROM {cls.table.name} WHERE "
         parts = []
         for key, item in where.items():
@@ -290,15 +298,18 @@ class BaseModel(ModelEntry):
             parts.append(f"{key} = {item}")
 
         stmnt = stmnt + " AND ".join(parts) + ";"
-
         cursor = cls.table.conn.cursor()
         cursor.execute(stmnt)
 
         result = cursor.fetchone()
 
-        # Can't throw an error here, maybe on a .get_by_id()
-        # if not result:
-        #     raise ResourceDoesNotExist("No resource found for clause: {}".format(where))
+        if not result and fail_if_not_found:
+            raise ResourceDoesNotExist(
+                "No resource found for clause: {}".format(where)
+            )
+
+        if not result and return_null:
+            return None
 
         return cls.from_row(result)
 
@@ -319,29 +330,112 @@ class BaseModel(ModelEntry):
         results = cursor.fetchall()
         return [cls.from_row(result) for result in results]
 
+    @classmethod
+    def delete(cls, where: Dict[str, Any]):
+        stmnt = f"DELETE FROM {cls.table.name} WHERE "
+        parts = []
+        for key, item in where.items():
+            if isinstance(item, str):
+                item = quote(item)
+            parts.append(f"{key} = {item}")
+
+        stmnt = stmnt + " AND ".join(parts) + ";"
+        cursor = cls.table.conn.cursor()
+        cursor.execute(stmnt)
+
+
+class ThirdParty(BaseModel):
+    table = Table(
+        _table_name.third_parties.value,
+        columns=[
+            Column("uuid", ColumnType.Varchar, unique=True),
+            Column("name", ColumnType.Varchar),
+        ],
+        conn=BitsyConfig.connection,
+    )
+
+    def __init__(self, uuid: str, name: Optional[str] = None):
+        self.uuid = uuid
+        self.name = name or ThirdParty.default_name()
+
+    @staticmethod
+    def default_name() -> str:
+        return f"unnamed-party-{dt.datetime.now().strftime('%Y-%m-%d')}"
+
+    def to_row(self) -> Tuple[Any]:
+        return (quote(self.uuid), quote(self.name))
+
+    def from_row(row: Tuple[Any]) -> "ThirdParty":
+        (uuid, name) = row
+        return ThirdParty(uuid, name)
+
+    def table_name(self) -> str:
+        return _table_name.third_parties.value
+
+    def __str__(self) -> str:
+        return self.uuid
+
+    @staticmethod
+    def create():
+        ThirdParty.table.create()
+
 
 class AccessToken(BaseModel):
     table = Table(
         _table_name.access_tokens.value,
         columns=[
             Column("uuid", ColumnType.Varchar, unique=True),
+            Column(
+                "third_party_id",
+                ColumnType.Varchar,
+                foreign_key=ForeignKey(
+                    "third_party_id",
+                    reference=ForeignKeyReference("third_parties", "uuid"),
+                ),
+            ),
+            Column("name", ColumnType.Varchar),
             Column("expiry", ColumnType.Integer, default=-1),
+            Column("active", ColumnType.Integer, default=0),
         ],
-        conn=BitsyConfig.conn,
+        conn=BitsyConfig.connection,
     )
 
     def __init__(
-        self, uuid: str = SQL_NULL, expiry: int = defaults.access_token_ttl
+        self,
+        uuid: str,
+        third_party: ThirdParty,
+        name: Optional[str] = None,
+        expiry: Optional[int] = None,
+        active: Optional[int] = 0,
     ):
         self.uuid = uuid
-        self.expiry = expiry
+        self.third_party = third_party
+        self.name = name or AccessToken.default_name()
+        self.expiry = expiry or AccessToken.default_ttl()
+        self.active = active
+
+    @staticmethod
+    def default_ttl() -> int:
+        return int(time.time()) + 60 * 60 * 24
+
+    @staticmethod
+    def default_name() -> str:
+        return f"unnamed-token-{dt.datetime.now().strftime('%Y-%m-%d')}"
 
     def from_row(row: Tuple[Any]) -> "AccessToken":
-        (key, expiry) = row
-        return AccessToken(key, expiry)
+        (key, third_party_id, name, expiry, active) = row
+        print(">>> ROW IS ", row)
+        party = ThirdParty.get(where={"uuid": third_party_id})
+        return AccessToken(key, party, name, expiry, active)
 
     def to_row(self) -> Tuple[Any]:
-        return (quote(self.uuid), quote(self.expiry))
+        return (
+            quote(self.uuid),
+            quote(self.third_party.uuid),
+            quote(self.name),
+            quote(self.expiry),
+            quote(self.active),
+        )
 
     @staticmethod
     def create():
@@ -353,50 +447,135 @@ class AccessToken(BaseModel):
     def is_expired(self) -> bool:
         return self.expiry > int(time.time())
 
+    def toggle(self):
+        self.active = 1 if self.active == 0 else 0
+        AccessToken.update(
+            update={"active": self.active}, where={"uuid": self.uuid}
+        )
 
-class ThirdParty(BaseModel):
+
+class Account(BaseModel):
     table = Table(
-        _table_name.third_parties.value,
+        _table_name.accounts.value,
         columns=[
-            Column("uuid", ColumnType.Varchar, unique=True),
-            Column(
-                "access_token",
-                ColumnType.Varchar,
-                foreign_key=ForeignKey(
-                    "access_token",
-                    reference=ForeignKeyReference("access_tokens", "uuid"),
-                ),
-            ),
+            Column("pubkey", ColumnType.Varchar, unique=True),
+            Column("address", ColumnType.Varchar, unique=True),
+            Column("created_at", ColumnType.Integer),
+            Column("nonce", ColumnType.Varchar, unique=True),
         ],
-        conn=BitsyConfig.conn,
+        conn=BitsyConfig.connection,
     )
 
-    def __init__(self, uuid: str, access_token: Optional[AccessToken] = None):
-        self.uuid = uuid
-        self.access_token = access_token
+    def __init__(
+        self,
+        pubkey: str,
+        address: str,
+        created_at: int = now(),
+        nonce: Optional[str] = None,
+    ):
+        self.pubkey = pubkey
+        self.address = address
+        self.created_at = created_at
+        self.nonce = nonce
+        self.jwt: Optional[str] = None
+
+    def set_jwt(self, jwt: str):
+        self.jwt = jwt
 
     def to_row(self) -> Tuple[Any]:
-        if self.access_token:
-            return (quote(self.uuid), quote(self.access_token.uuid))
-        return (quote(self.uuid), SQL_NULL)
+        nonce = quote(self.nonce) if self.nonce is not None else SQL_NULL
+        return (
+            quote(self.pubkey),
+            quote(self.address),
+            quote(self.created_at),
+            nonce,
+        )
 
-    def from_row(row: Tuple[Any]) -> "ThirdParty":
-        row = tuple([item for item in row if item])
-        if len(row) == 2:
-            (uuid, access_token) = row
-            return ThirdParty(uuid, AccessToken(access_token))
-        (uuid,) = row
-        return ThirdParty(uuid)
-
-    def table_name(self) -> str:
-        return _table_name.third_parties.value
-
-    def __str__(self) -> str:
-        return self.uuid
+    def from_row(row: Tuple[Any]) -> "Account":
+        (pubkey, address, created_at, nonce) = row
+        return Account(pubkey, address, created_at, nonce)
 
     @staticmethod
     def create():
-        ThirdParty.table.create()
+        Account.table.create()
+
+    def create_party_settings(self):
+        settings = [
+            Setting(self, SettingKey.Webhooks, 1),
+            Setting(self, SettingKey.ProgrammaticWebhookAccess, 1),
+            Setting(self, SettingKey.BitsyVaultDeletegation, 1),
+        ]
+
+        for setting in settings:
+            setting.save()
+
+    def create_account_settings(self):
+        settings = [
+            Setting(self, SettingKey.BitsyVaultDeletegation, 1),
+            Setting(self, SettingKey.ProgrammaticThirdPartyAccess, 0),
+            Setting(self, SettingKey.ThirdPartyNotifications, 1),
+        ]
+
+        for setting in settings:
+            setting.save()
+
+
+class AccountStat:
+    def __init__(self, account_age: int, perm_count: int):
+        self.account_age = account_age
+        self.perm_count = perm_count
+
+    def from_row(row: Tuple[Any]) -> "AccountStat":
+        (account_age, perm_count) = row
+        return AccountStat(account_age, perm_count)
+
+
+class ThirdPartyAccount(BaseModel):
+    table = Table(
+        _table_name.third_party_accounts.value,
+        columns=[
+            Column(
+                "third_party_id",
+                ColumnType.Varchar,
+                foreign_key=ForeignKey(
+                    "third_party_id",
+                    reference=ForeignKeyReference("third_parties", "uuid"),
+                ),
+            ),
+            Column(
+                "account_address",
+                ColumnType.Varchar,
+                foreign_key=ForeignKey(
+                    "account_address",
+                    reference=ForeignKeyReference("accounts", "address"),
+                ),
+            ),
+        ],
+        conn=BitsyConfig.connection,
+    )
+
+    def __init__(self, party: ThirdParty, account: Account):
+        self.party = party
+        self.account = account
+
+    def to_row(self) -> Tuple[Any]:
+        return (
+            quote(self.party.uuid),
+            quote(self.account.address),
+        )
+
+    def from_row(row: Tuple[Any]) -> "ThirdPartyAccount":
+        (third_party_id, account_address) = row
+        party = ThirdParty.get(where={"uuid": third_party_id})
+        account = Account.get(where={"address": account_address})
+        return ThirdPartyAccount(party, account)
+
+    def table_name(self) -> str:
+        return _table_name.third_party_accounts.value
+
+    @staticmethod
+    def create():
+        ThirdPartyAccount.table.create()
 
 
 class Permission(BaseModel):
@@ -416,11 +595,11 @@ class Permission(BaseModel):
             ),
             Column("value", ColumnType.Integer, default=0),
             Column(
-                "account_pubkey",
+                "account_address",
                 ColumnType.Varchar,
                 foreign_key=ForeignKey(
-                    "account_pubkey",
-                    reference=ForeignKeyReference("accounts", "pubkey"),
+                    "account_address",
+                    reference=ForeignKeyReference("accounts", "address"),
                 ),
             ),
             Column(
@@ -433,7 +612,7 @@ class Permission(BaseModel):
             ),
             Column("ttl", ColumnType.Integer, default=-1),
         ],
-        conn=BitsyConfig.conn,
+        conn=BitsyConfig.connection,
     )
 
     def __init__(
@@ -460,7 +639,7 @@ class Permission(BaseModel):
             quote(self.key.value),
             quote(self.document.cid),
             str(self.value),
-            quote(self.account.pubkey),
+            quote(self.account.address),
             quote(self.third_party.uuid),
             str(self.ttl),
         )
@@ -471,12 +650,12 @@ class Permission(BaseModel):
             key,
             document_cid,
             value,
-            pubkey,
+            account_address,
             third_party_id,
             ttl,
         ) = row
         document = Document.get({"cid": document_cid})
-        account = Account.get({"pubkey": pubkey})
+        account = Account.get({"address": account_address})
         party = ThirdParty.get({"uuid": third_party_id})
         return Permission(
             uuid,
@@ -492,57 +671,6 @@ class Permission(BaseModel):
     def create():
         Permission.table.create()
 
-    def delete(self):
-        stmtnt = f"DELETE FROM {self.table.name} WHERE uuid = '{self.uuid}';"
-        cursor = self.table.conn.cursor()
-        cursor.execute(stmtnt)
-
-
-class Account(BaseModel):
-    table = Table(
-        _table_name.accounts.value,
-        columns=[
-            Column("pubkey", ColumnType.Varchar, unique=True),
-            Column("created_at", ColumnType.Integer),
-        ],
-        conn=BitsyConfig.conn,
-    )
-
-    def __init__(self, pubkey: str, created_at: int = now()):
-        self.pubkey = pubkey
-        self.created_at = created_at
-
-    def to_row(self) -> Tuple[Any]:
-        return (quote(self.pubkey), quote(self.created_at))
-
-    def from_row(row: Tuple[Any]) -> "Account":
-        (pubkey, created_at) = row
-        return Account(pubkey, created_at)
-
-    @staticmethod
-    def create():
-        Account.table.create()
-
-    def create_settings(self):
-        settings = [Setting(self.pubkey, SettingKey.BitsyVaultDeletegation, 1)]
-
-        for setting in settings:
-            if setting.key == SettingKey.BitsyVaultDeletegation:
-                access_token = AccessToken(uuid4())
-                access_token.save()
-                setting.access_token = access_token
-            setting.save()
-
-
-class AccountStat:
-    def __init__(self, account_age: int, perm_count: int):
-        self.account_age = account_age
-        self.perm_count = perm_count
-
-    def from_row(row: Tuple[Any]) -> "AccountStat":
-        (account_age, perm_count) = row
-        return AccountStat(account_age, perm_count)
-
 
 class Document(BaseModel):
     table = Table(
@@ -551,16 +679,16 @@ class Document(BaseModel):
             Column("cid", ColumnType.Varchar, unique=True),
             Column("blob", ColumnType.Bytea),
             Column(
-                "account_pubkey",
+                "account_address",
                 ColumnType.Varchar,
                 foreign_key=ForeignKey(
-                    "account_pubkey",
-                    reference=ForeignKeyReference("accounts", "pubkey"),
+                    "account_address",
+                    reference=ForeignKeyReference("accounts", "address"),
                 ),
             ),
             Column("key_image", ColumnType.Varchar),
         ],
-        conn=BitsyConfig.conn,
+        conn=BitsyConfig.connection,
     )
 
     def __init__(
@@ -579,16 +707,17 @@ class Document(BaseModel):
         return (
             quote(self.cid),
             quote(self.blob.decode()),
-            quote(self.account.pubkey),
+            quote(self.account.address),
             quote(self.key_img),
         )
 
     def from_row(row: Tuple[Any]) -> "Document":
-        (cid, blob, pubkey, key_img) = row
+        (cid, blob, account_address, key_img) = row
+        account = Account.get(where={"address": account_address})
         return Document(
             cid,
             DocumentBlob(decode(blob, Encoding.UTF8)),
-            Account(pubkey),
+            account,
             key_img,
         )
 
@@ -614,60 +743,40 @@ class Setting(BaseModel):
         _table_name.settings.value,
         columns=[
             Column(
-                "account_pubkey",
+                "account_address",
                 ColumnType.Varchar,
                 foreign_key=ForeignKey(
-                    "account_pubkey",
-                    reference=ForeignKeyReference("accounts", "pubkey"),
+                    "account_address",
+                    reference=ForeignKeyReference("accounts", "address"),
                 ),
             ),
             Column("key", ColumnType.Varchar),
             Column("value", ColumnType.Integer),
-            Column(
-                "access_token",
-                ColumnType.Varchar,
-                foreign_key=ForeignKey(
-                    "access_token",
-                    reference=ForeignKeyReference("access_tokens", "uuid"),
-                ),
-                null=True,
-            ),
         ],
-        conn=BitsyConfig.conn,
+        conn=BitsyConfig.connection,
     )
 
     def __init__(
         self,
-        account_pubkey: str,
+        account: Account,
         key: SettingKey,
         value: int,
-        access_token: Optional[AccessToken] = None,
     ):
-        self.account_pubkey = account_pubkey
+        self.account = account
         self.key = key
         self.value = value
-        self.access_token = access_token
 
     def to_row(self) -> Tuple[Any]:
-        token = (
-            quote(self.access_token.uuid)
-            if not is_nullish(self.access_token)
-            else SQL_NULL
-        )
-
         return (
-            quote(self.account_pubkey),
+            quote(self.account.address),
             quote(self.key.value),
             quote(self.value),
-            token,
         )
 
     def from_row(row: Tuple[Any]) -> "Setting":
-        (account_pubkey, key, value, access_token) = row
-        access_token = (
-            AccessToken(access_token) if not is_nullish(access_token) else None
-        )
-        return Setting(account_pubkey, SettingKey(key), value, access_token)
+        (account_address, key, value) = row
+        account = Account.get(where={"address": account_address})
+        return Setting(account, SettingKey(key), value)
 
     def enabled(self) -> bool:
         return self.value == 1
@@ -677,10 +786,86 @@ class Setting(BaseModel):
 
     def toggle(self):
         self.value = 0 if self.value == 1 else 1
+        Setting.update(
+            update={"value": self.value},
+            where={
+                "key": self.key.value,
+                "account_address": self.account.address,
+            },
+        )
 
     @staticmethod
     def create():
         Setting.table.create()
+
+
+class WebhookType(enum.Enum):
+    Incoming = "Incoming"
+    Outgoing = "Outgoing"
+
+
+class Webhook(BaseModel):
+    table = Table(
+        _table_name.webhooks.value,
+        columns=[
+            Column("uuid", ColumnType.Varchar, unique=True),
+            Column(
+                "third_party_id",
+                ColumnType.Varchar,
+                foreign_key=ForeignKey(
+                    "third_party_id",
+                    reference=ForeignKeyReference("third_parties", "uuid"),
+                ),
+            ),
+            Column("endpoint", ColumnType.Varchar),
+            Column("type", ColumnType.Varchar),
+            Column("name", ColumnType.Varchar),
+            Column("active", ColumnType.Integer, default=0),
+        ],
+        conn=BitsyConfig.connection,
+    )
+
+    def __init__(
+        self,
+        uuid: str,
+        third_party: ThirdParty,
+        endpoint: str,
+        type: WebhookType,
+        name: str,
+        active: int = 0,
+    ):
+        self.uuid = uuid
+        self.third_party = third_party
+        self.endpoint = endpoint
+        self.type = type
+        self.name = name
+        self.active = active
+
+    def to_row(self) -> Tuple[Any]:
+        return (
+            quote(self.uuid),
+            quote(self.third_party.uuid),
+            quote(self.endpoint),
+            quote(self.type.value),
+            quote(self.name),
+            quote(self.active),
+        )
+
+    @staticmethod
+    def from_row(row: Tuple[Any]) -> "Webhook":
+        (uuid, third_party_id, endpoint, type, name, active) = row
+        party = ThirdParty.get(where={"uuid": third_party_id})
+        return Webhook(uuid, party, endpoint, WebhookType[type], name, active)
+
+    @staticmethod
+    def create():
+        Webhook.table.create()
+
+    def toggle(self):
+        self.active = 0 if self.active == 1 else 1
+        Webhook.update(
+            update={"active": self.active}, where={"uuid": self.uuid}
+        )
 
 
 class Model:
@@ -690,3 +875,5 @@ class Model:
     Account = Account
     Document = Document
     Setting = Setting
+    Webhook = Webhook
+    ThirdPartyAccount = ThirdPartyAccount
