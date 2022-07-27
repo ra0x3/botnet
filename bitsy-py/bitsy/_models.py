@@ -9,7 +9,7 @@ from ._utils import *
 from ._const import SQL_NULL
 from ._errors import *
 from ._crypto import fernet_bundle, FernetBundle
-from ._config import BitsyConfig
+from ._config import config
 
 
 logger = logging.getLogger("bitsy.models")
@@ -157,7 +157,7 @@ class Table:
         self,
         name: str,
         columns: List[Column],
-        conn: sqlite3.Connection,
+        conn: Any,
     ):
         self.name = name
         self.columns = columns
@@ -351,7 +351,7 @@ class ThirdParty(BaseModel):
             Column("uuid", ColumnType.Varchar, unique=True),
             Column("name", ColumnType.Varchar),
         ],
-        conn=BitsyConfig.connection,
+        conn=config.connection,
     )
 
     def __init__(self, uuid: str, name: Optional[str] = None):
@@ -397,7 +397,7 @@ class AccessToken(BaseModel):
             Column("expiry", ColumnType.Integer, default=-1),
             Column("active", ColumnType.Integer, default=0),
         ],
-        conn=BitsyConfig.connection,
+        conn=config.connection,
     )
 
     def __init__(
@@ -424,7 +424,6 @@ class AccessToken(BaseModel):
 
     def from_row(row: Tuple[Any]) -> "AccessToken":
         (key, third_party_id, name, expiry, active) = row
-        print(">>> ROW IS ", row)
         party = ThirdParty.get(where={"uuid": third_party_id})
         return AccessToken(key, party, name, expiry, active)
 
@@ -463,7 +462,7 @@ class Account(BaseModel):
             Column("created_at", ColumnType.Integer),
             Column("nonce", ColumnType.Varchar, unique=True),
         ],
-        conn=BitsyConfig.connection,
+        conn=config.connection,
     )
 
     def __init__(
@@ -551,7 +550,7 @@ class ThirdPartyAccount(BaseModel):
                 ),
             ),
         ],
-        conn=BitsyConfig.connection,
+        conn=config.connection,
     )
 
     def __init__(self, party: ThirdParty, account: Account):
@@ -612,7 +611,7 @@ class Permission(BaseModel):
             ),
             Column("ttl", ColumnType.Integer, default=-1),
         ],
-        conn=BitsyConfig.connection,
+        conn=config.connection,
     )
 
     def __init__(
@@ -688,7 +687,7 @@ class Document(BaseModel):
             ),
             Column("key_image", ColumnType.Varchar),
         ],
-        conn=BitsyConfig.connection,
+        conn=config.connection,
     )
 
     def __init__(
@@ -753,7 +752,7 @@ class Setting(BaseModel):
             Column("key", ColumnType.Varchar),
             Column("value", ColumnType.Integer),
         ],
-        conn=BitsyConfig.connection,
+        conn=config.connection,
     )
 
     def __init__(
@@ -822,7 +821,7 @@ class Webhook(BaseModel):
             Column("name", ColumnType.Varchar),
             Column("active", ColumnType.Integer, default=0),
         ],
-        conn=BitsyConfig.connection,
+        conn=config.connection,
     )
 
     def __init__(

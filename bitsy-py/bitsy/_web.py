@@ -139,15 +139,33 @@ class JwtMiddlware(BaseHTTPMiddleware):
             response = await call_next(request)
             return response
 
-        token: str = request.headers["Authorization"]
+        try:
+            token: str = request.headers["Authorization"]
+        except KeyError as err:
+            return JSONResponse(
+                content={"details": "Unauthorized"},
+                status_code=status.HTTP_401_UNAUTHORIZED,
+            )
+
         if token.startswith("Bearer"):
             token = token[7:]
-        payload = jwt.decode(
-            token, BitsyConfig.jwt_secret, algorithms=[BitsyConfig.jwt_algo]
-        )
+
+        payload: str
+        try:
+            payload = jwt.decode(
+                token, BitsyConfig.jwt_secret, algorithms=[BitsyConfig.jwt_algo]
+            )
+        except Exception as err:
+            return JSONResponse(
+                content={"details": "Invalid JWT"},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
         account = Model.Account.get(
-            where={"address": to_checksum_address(payload["address"])}
+            where={"address": to_checksum_address(payload["address"])},
+            fail_if_not_found=True,
         )
+
         party = Model.ThirdPartyAccount.get(
             where={"account_address": to_checksum_address(payload["address"])}
         )

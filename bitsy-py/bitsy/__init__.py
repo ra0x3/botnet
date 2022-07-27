@@ -1,11 +1,16 @@
 import enum
 import logging
 import sys
-
 from uvicorn import Config, Server
 from loguru import logger
-
 from ._utils import load_dot_env
+
+load_dot_env()
+
+from ._config import config
+from ._web import app as _app
+from ._graphql import graphql_app
+from ._t import *
 
 
 class Environment(enum.Enum):
@@ -13,28 +18,16 @@ class Environment(enum.Enum):
     Production = "prod"
 
 
-load_dot_env()
-
-from ._web import app as _app
-from ._graphql import graphql_app
-from ._config import BitsyConfig
-from ._t import *
-
-config = BitsyConfig.from_default_manifest()
-
-
-_LOG_LEVEL = logging.getLevelName(config.log_level)
+log_level = logging.getLevelName(config.log_level)
 
 
 class _InterceptHandler(logging.Handler):
     def emit(self, record):
-        # Get corresponding Loguru level if it exists
         try:
             level = logger.level(record.levelname).name
         except ValueError:
             level = record.levelno
 
-        # Find caller from where originated the logged message
         frame, depth = logging.currentframe(), 2
         while frame.f_code.co_filename == logging.__file__:
             frame = frame.f_back
@@ -46,22 +39,19 @@ class _InterceptHandler(logging.Handler):
 
 
 def _setup_logging():
-    # intercept everything at the root logger
     logging.root.handlers = [_InterceptHandler()]
-    logging.root.setLevel(_LOG_LEVEL)
+    logging.root.setLevel(log_level)
 
-    # remove every other logger's handlers and propagate to root logger
     for name in logging.root.manager.loggerDict.keys():
         logging.getLogger(name).handlers = []
         logging.getLogger(name).propagate = True
 
-    # configure loguru
     logger.configure(handlers=[{"sink": sys.stdout, "serialize": 0}])
 
 
 _app.include_router(graphql_app, prefix="/graphql")
 
-logger.info(config)
+logger.info(config.to_json())
 
 
 server = Server(
@@ -69,10 +59,9 @@ server = Server(
         "bitsy:_app",
         host=config.api_host,
         port=config.api_port,
-        log_level=_LOG_LEVEL,
+        log_level=log_level,
         workers=config.workers,
-        # reload=config.env == Environment.Development.value,
-        reload=True,
+        reload=config.env == Environment.Development.value,
         use_colors=True,
         timeout_keep_alive=5,
         log_config={
@@ -112,7 +101,6 @@ server = Server(
             },
         },
         debug=config.env == Environment.Development.value,
-        # env_file=dotenv_path,
     ),
 )
 

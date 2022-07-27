@@ -14,12 +14,9 @@ from bitsy._t import *
 from bitsy._const import web3
 from bitsy._models import Model
 from bitsy._crypto import Keypair
-from bitsy._config import BitsyConfig
+from bitsy._config import config
 
 from .utils import *
-
-
-config = BitsyConfig.from_default_manifest()
 
 
 class BaseTestClass:

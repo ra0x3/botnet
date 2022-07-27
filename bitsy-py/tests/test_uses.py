@@ -3,14 +3,14 @@ from bitsy._uses import *
 from bitsy._utils import *
 from bitsy._models import *
 from bitsy._crypto import *
-from bitsy._config import BitsyConfig
+from bitsy._config import config
 
 from .conftest import *
 
 
 class TestUsesCases(BaseTestClass):
     def setup_method(self):
-        self.conn = BitsyConfig.connection
+        self.conn = config.connection
 
     def test_can_create_store_get_access_token(self, keypair):
         party = create_third_party("foo")

@@ -141,7 +141,7 @@ class AccessTokensView extends React.Component<AccessTokensViewProps, AccessToke
       return;
     }
 
-    this.setState({items: data});
+    this.setState({items: data.sort((a: AccessToken, b: AccessToken) => a.expiry < b.expiry )});
   }
 
   updateAccessTokenItem(token: AccessToken) {

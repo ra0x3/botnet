@@ -1,7 +1,7 @@
-import sqlite3
 import pathlib
 import sys
 import os
+import logging
 import time
 import enum
 import uuid
@@ -10,11 +10,13 @@ import json
 import binascii
 import psycopg2
 from dotenv import load_dotenv
-from black import Encoding
 from blake3 import blake3
 from ._const import SQL_NULL
 
 from ._t import *
+
+
+logger = logging.getLogger("bitsy.utils")
 
 
 def str_bool_to_int(s: Union[str, bool], t: Union[str, bool]) -> int:
@@ -56,9 +58,16 @@ def load_dot_env():
 def create_postgres_conn(
     database: str, user: str, password: str, host: str, port: str
 ):
-    return psycopg2.connect(
-        database=database, user=user, password=password, host=host, port=port
-    )
+    try:
+        return psycopg2.connect(
+            database=database,
+            user=user,
+            password=password,
+            host=host,
+            port=port,
+        )
+    except Exception as err:
+        logger.warning("Could not connect to postgres: %s", str(err))
 
 
 def encode_json(d: Dict[str, Any]) -> str:

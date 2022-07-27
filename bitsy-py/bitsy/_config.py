@@ -1,5 +1,7 @@
 import yaml
 import enum
+import argparse
+import copy
 import datetime as dt
 import os
 import json
@@ -14,7 +16,7 @@ class KeyStoreProvider(enum.Enum):
     Vault = "vault"
 
 
-class _LogLevel(enum.Enum):
+class LogLevel(enum.Enum):
     INFO = "INFO"
     DEBUG = "DEBUG"
     WARN = "WARN"
@@ -33,9 +35,12 @@ def derive_jwt(params: Dict[str, str]):
 
 class BitsyConfig:
 
+    env: str = env_with_default()
+
     jwt_secret: str = env_var("JWT_SECRET")
 
     jwt_algo: str = "HS256"
+
     jwt_expiry_days: str = "90"
 
     api_host: str = "127.0.0.1"
@@ -54,7 +59,7 @@ class BitsyConfig:
 
     pg_port: str = "5432"
 
-    log_level: _LogLevel = _LogLevel.DEBUG
+    log_level: LogLevel = LogLevel.DEBUG
 
     workers: int = 3
 
@@ -63,8 +68,6 @@ class BitsyConfig:
     connection = create_postgres_conn(
         pg_database, pg_user, pg_password, pg_host, pg_port
     )
-
-    jwt_secret: str = "foo"
 
     keystore_provider: KeyStoreProvider = KeyStoreProvider.Vault.value
 
@@ -76,14 +79,35 @@ class BitsyConfig:
         return BitsyConfig._load_config(path)
 
     @staticmethod
+    def from_default_manifest_with_opts(opts: Dict[str, Any]) -> "BitsyConfig":
+        config = BitsyConfig.from_default_manifest()
+        config.__dict__.update(opts)
+        config.reset_posgres_connection()
+        return config
+
+    @staticmethod
     def from_default_manifest() -> "BitsyConfig":
-        env = env_with_default()
         path = os.path.join(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
             "config",
-            f"bitsy.{env}.yaml",
+            f"bitsy.{BitsyConfig.env}.yaml",
         )
         return BitsyConfig._load_config(path)
+
+    def reset_posgres_connection(self):
+        self.connection = create_postgres_conn(
+            self.pg_database,
+            self.pg_user,
+            self.pg_password,
+            self.pg_host,
+            self.pg_port,
+        )
+
+    def to_json(self) -> str:
+        object = dict(
+            [(k, v) for k, v in self.__dict__.items() if k != "connection"]
+        )
+        return json.dumps(object)
 
     @staticmethod
     def _load_config(path: str) -> "BitsyConfig":
@@ -95,3 +119,90 @@ class BitsyConfig:
 
     def __str__(self) -> str:
         return json.dumps(self.__dict__)
+
+
+def parse_args() -> Dict[str, Any]:
+    if is_pytest_session():
+        return {}
+
+    parser = argparse.ArgumentParser(description="bitsy-py <3")
+    parser.add_argument(
+        "-e",
+        "--env",
+        type=str,
+        default="dev",
+        nargs="?",
+        const=1,
+        help="Environment",
+    )
+    parser.add_argument(
+        "--api_host",
+        type=str,
+        default="0.0.0.0",
+        nargs="?",
+        const=1,
+        help="Web API host",
+    )
+    parser.add_argument(
+        "--api_port",
+        type=int,
+        default=8000,
+        nargs="?",
+        const=1,
+        help="Web API port",
+    )
+    parser.add_argument(
+        "--pg_database",
+        type=str,
+        default="bitsy",
+        nargs="?",
+        const=1,
+        help="Postgres database",
+    )
+    parser.add_argument(
+        "--pg_user",
+        type=str,
+        default="postgres",
+        nargs="?",
+        const=1,
+        help="Postgres user",
+    )
+    parser.add_argument(
+        "--pg_password",
+        type=str,
+        default="",
+        nargs="?",
+        const=1,
+        help="Postgres password",
+    )
+    parser.add_argument(
+        "--pg_host",
+        type=str,
+        default="127.0.0.1",
+        nargs="?",
+        const=1,
+        help="Postgres host",
+    )
+    parser.add_argument(
+        "--pg_port",
+        type=str,
+        default="5432",
+        nargs="?",
+        const=1,
+        help="Postgres port",
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=3,
+        nargs="?",
+        const=1,
+        help="Number of workers",
+    )
+
+    args = vars(parser.parse_args())
+
+    return args
+
+
+config = BitsyConfig.from_default_manifest_with_opts(parse_args())

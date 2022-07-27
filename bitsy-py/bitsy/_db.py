@@ -3,7 +3,7 @@ import logging
 
 from ._models import *
 from ._t import *
-from ._config import BitsyConfig
+from ._config import config
 from ._utils import *
 from ._errors import *
 
@@ -12,8 +12,7 @@ logger = logging.getLogger("bitsy.db")
 
 class _Database:
     def __init__(self):
-        self.config: BitsyConfig = BitsyConfig.from_default_manifest()
-        self._conn = self.config.connection
+        self._conn = config.connection
         self._models: List[Model] = []
         self._models_map: Dict[str, Model] = {}
         self._init()
