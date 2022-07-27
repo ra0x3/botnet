@@ -427,8 +427,8 @@ router = APIRouter(route_class=DummyRoute)
 
 app.include_router(router)
 app.add_middleware(JwtMiddlware)
-# if not is_pytest_session():
-#     app.add_middleware(CatchAllMiddleware)
+if not is_pytest_session():
+    app.add_middleware(CatchAllMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,

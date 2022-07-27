@@ -33,43 +33,41 @@ def derive_jwt(params: Dict[str, str]):
     )
 
 
-class BitsyConfig:
-
-    env: str = env_with_default()
-
-    jwt_secret: str = env_var("JWT_SECRET")
-
-    jwt_algo: str = "HS256"
-
-    jwt_expiry_days: str = "90"
-
+class Defaults:
     api_host: str = "127.0.0.1"
-
     api_port: int = 8000
-
-    vault_address: str = "http://127.0.0.1:8200"
-
-    pg_database: str = "bitsy"
-
-    pg_user: str = "postgres"
-
-    pg_password: str = ""
-
-    pg_host: str = "127.0.0.1"
-
-    pg_port: str = "5432"
-
+    env: str = env_with_default()
+    log_file: str = "bitsy.log"
     log_level: LogLevel = LogLevel.DEBUG
-
+    pg_database: str = "bitsy"
+    pg_host: str = "127.0.0.1"
+    pg_password: str = ""
+    pg_port: str = "5432"
+    pg_user: str = "postgres"
+    vault_address: str = "http://127.0.0.1:8200"
     workers: int = 3
 
-    log_file: str = "bitsy.log"
 
+class BitsyConfig:
+    api_host: str = Defaults.api_host
+    api_port: int = Defaults.api_port
+    env: str = Defaults.env
+    jwt_algo: str = "HS256"
+    jwt_expiry_days: str = "90"
+    jwt_secret: str = env_var("JWT_SECRET")
+    keystore_provider: KeyStoreProvider = KeyStoreProvider.Vault.value
+    log_file: str = Defaults.log_file
+    log_level: LogLevel = LogLevel.DEBUG
+    pg_database: str = Defaults.pg_database
+    pg_host: str = Defaults.pg_host
+    pg_password: str = Defaults.pg_password
+    pg_port: str = Defaults.pg_port
+    pg_user: str = Defaults.pg_user
+    vault_address: str = Defaults.vault_address
+    workers: int = Defaults.workers
     connection = create_postgres_conn(
         pg_database, pg_user, pg_password, pg_host, pg_port
     )
-
-    keystore_provider: KeyStoreProvider = KeyStoreProvider.Vault.value
 
     def __init__(self, **kwargs):
         self.__dict__.update(kwargs)
@@ -201,6 +199,14 @@ def parse_args() -> Dict[str, Any]:
     )
 
     args = vars(parser.parse_args())
+
+    def replace_empty_strings(d: Dict[str, Any]) -> Dict[str, Any]:
+        for k, v in d.items():
+            if v == "" or v == 1:  # FIXME
+                d[k] = Defaults.__dict__[k]
+        return d
+
+    args = replace_empty_strings(args)
 
     return args
 

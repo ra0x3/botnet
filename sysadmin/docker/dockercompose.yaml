@@ -1,0 +1,26 @@
+version: "3.9"  # optional since v1.27.0
+services:
+  bitsy-api:
+    image: bitsy/py:latest
+    environment:
+      - ENV=dev
+      - PG_HOST=${PG_HOST}
+      - PG_PORT=${PG_PORT}
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/usr/local
+      - logvolume01:/var/log
+  bitsy-vault:
+    image: bitsy/py:latest
+    environment:
+      - ENV=dev
+      - PG_HOST=${PG_HOST}
+      - PG_PORT=${PG_PORT}
+    ports:
+      - "8001:8001"
+    volumes:
+      - .:/usr/local
+      - logvolume01:/var/log
+volumes:
+  logvolume01: {}

@@ -163,3 +163,6 @@ yarn-debug.log*
 yarn-error.log*
 
 TODO.md
+
+# bitsy-rs
+**/target
