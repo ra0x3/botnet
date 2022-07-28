@@ -2,6 +2,7 @@
 extern crate diesel;
 extern crate diesel_codegen;
 
+
 pub mod bitsy_diesel {
     pub mod prelude {
         pub use diesel::prelude::*;
@@ -22,6 +23,7 @@ pub mod database {
     use diesel::{prelude::PgConnection, sql_query, Connection, RunQueryDsl};
     use r2d2_diesel::ConnectionManager;
 
+    #[allow(unused)]
     type PgConnectionPool = r2d2::Pool<ConnectionManager<PgConnection>>;
     pub struct ConnWrapper(PgConnection);
 
@@ -91,13 +93,8 @@ pub mod tables {
 pub mod models {
 
     use super::tables::{accounts, documents};
-    use diesel::prelude::*;
     use diesel::{
         Insertable, Queryable, QueryableByName,
-        {
-            result::{DatabaseErrorKind, Error as ResultError, QueryResult},
-            sql_types::*,
-        },
     };
     use serde::{Deserialize, Serialize};
 
@@ -116,7 +113,7 @@ pub mod models {
         Queryable, QueryableByName, Insertable, Debug, Associations, Serialize, Deserialize,
     )]
     #[table_name = "documents"]
-    #[belongs_to(parent = Account<address>)]
+    #[belongs_to(parent = Account<'_>)]
     pub struct Document {
         pub cid: String,
         pub blob: Vec<u8>,
