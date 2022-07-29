@@ -52,7 +52,7 @@ def load_dot_env():
     pwd = os.environ["PWD"]
     env_name = env_with_default()
     env_path = os.path.join(os.path.dirname(pwd), "env", f".env.{env_name}")
-    print("Using env file at %s", env_path)
+    print("Using env file at {}".format(env_path))
     load_dotenv(env_path)
 
 
