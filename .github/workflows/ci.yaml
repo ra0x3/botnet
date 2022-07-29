@@ -1,0 +1,108 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+  release:
+    types: [published]
+
+env:
+  DATABASE_URL: postgres://postgres:my-secret@localhost:5432
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+  REGISTRY: ghcr.io
+
+jobs:
+  cancel-previous-runs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cancel Previous Runs
+        uses: styfle/cancel-workflow-action@0.9.1
+        with:
+          access_token: ${{ github.token }}
+
+  bitsy-rs:
+    needs: cancel-previous-runs
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:latest
+        env:
+          POSTGRES_PASSWORD: my-secret
+          POSTGRES_DB: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        
+      - name: Install rust
+        uses: actions-rs/install@v0.1
+        with:
+          crate: cargo-audit
+          version: latest
+      - run: |
+          cd ./bitsy-rs
+          cargo check --locked --workspace --all-features --all-targets
+          cargo build --locked --workspace --all-features --all-targets
+          cargo test --locked --workspace
+        env:
+          RUSTFLAGS: "-D warnings"
+
+  bitsy-py:
+    needs:
+      - cancel-previous-runs
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:latest
+        env:
+          POSTGRES_PASSWORD: my-secret
+          POSTGRES_DB: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+    
+      - name: Install pipenv
+        run: |
+          curl https://raw.githubusercontent.com/pypa/pipenv/master/get-pipenv.py | python
+          pipenv install
+
+      - name: Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.9.0"
+          architecture: "x64" 
+          cache: "pip"
+      - run: |
+          cd bitsy-py/requirements
+          pipenv install
+          pipenv sync --dev
+      - run: |
+          cd bitsy-py
+          pytest -vvx -s
+
+  bitsy-www:
+    needs:
+      - cancel-previous-runs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Setup node
+        uses: actions/setup-node@v1
+        with:
+          node-version: "18.0.0"
+      - run: |
+          cd www/bitsy
+          yarn install --frozen-lockfile
+          yarn build

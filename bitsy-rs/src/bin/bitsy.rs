@@ -1,8 +1,6 @@
-use anyhow::Result;
 use async_std::sync::{Arc, Mutex};
 use axum::{
-    extract::{Extension, Json, Path},
-    http::StatusCode,
+    extract::{Extension, Json},
     routing::post,
     Router,
 };
@@ -11,8 +9,8 @@ use bitsy::{
         prelude::*,
     },
     database::{Database},
-    models::{Account, Document},
-    tables::{accounts::dsl::*, documents::dsl::*},
+    models::{Account},
+    tables::{accounts::dsl::*},
 };
 use clap::Parser;
 use serde::Deserialize;
@@ -42,6 +40,7 @@ pub struct Args {
     pg_database: String,
 }
 
+#[allow(unused)]
 #[derive(Deserialize, Debug)]
 struct AccessRequest {
     pub cid: String,

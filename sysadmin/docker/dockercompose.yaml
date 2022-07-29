@@ -12,11 +12,20 @@ services:
       - .:/usr/local
       - logvolume01:/var/log
   bitsy-vault:
-    image: bitsy/py:latest
+    image: bitsy/vault:latest
     environment:
       - ENV=dev
-      - PG_HOST=${PG_HOST}
-      - PG_PORT=${PG_PORT}
+    env_file: ./../env/.env.dev
+    ports:
+      - "8001:8001"
+    volumes:
+      - .:/usr/local
+      - logvolume01:/var/log
+  bitsy-rs:
+    image: bitsy/rs:latest
+    environment:
+      - ENV=dev
+    env_file: ./../env/.env.dev
     ports:
       - "8001:8001"
     volumes:
