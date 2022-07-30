@@ -101,7 +101,7 @@ jobs:
       - name: Setup node
         uses: actions/setup-node@v1
         with:
-          node-version: "18.0.0"
+          node-version: "16.0.0"
       - run: |
           cd www/bitsy
           yarn install --frozen-lockfile

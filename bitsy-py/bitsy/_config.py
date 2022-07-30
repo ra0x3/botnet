@@ -1,7 +1,6 @@
 import yaml
 import enum
 import argparse
-import copy
 import datetime as dt
 import os
 import json
@@ -134,57 +133,57 @@ def parse_args() -> Dict[str, Any]:
         help="Environment",
     )
     parser.add_argument(
-        "--api_host",
+        "--api-host",
         type=str,
-        default="0.0.0.0",
+        default=Defaults.api_host,
         nargs="?",
         const=1,
         help="Web API host",
     )
     parser.add_argument(
-        "--api_port",
+        "--api-port",
         type=int,
-        default=8000,
+        default=Defaults.api_port,
         nargs="?",
         const=1,
         help="Web API port",
     )
     parser.add_argument(
-        "--pg_database",
+        "--pg-database",
         type=str,
-        default="bitsy",
+        default=Defaults.pg_database,
         nargs="?",
         const=1,
         help="Postgres database",
     )
     parser.add_argument(
-        "--pg_user",
+        "--pg-user",
         type=str,
-        default="postgres",
+        default=Defaults.pg_user,
         nargs="?",
         const=1,
         help="Postgres user",
     )
     parser.add_argument(
-        "--pg_password",
+        "--pg-password",
         type=str,
-        default="",
+        default=Defaults.pg_password,
         nargs="?",
         const=1,
         help="Postgres password",
     )
     parser.add_argument(
-        "--pg_host",
+        "--pg-host",
         type=str,
-        default="127.0.0.1",
+        default=Defaults.pg_host,
         nargs="?",
         const=1,
         help="Postgres host",
     )
     parser.add_argument(
-        "--pg_port",
+        "--pg-port",
         type=str,
-        default="5432",
+        default=Defaults.pg_port,
         nargs="?",
         const=1,
         help="Postgres port",
@@ -192,10 +191,18 @@ def parse_args() -> Dict[str, Any]:
     parser.add_argument(
         "--workers",
         type=int,
-        default=3,
+        default=Defaults.workers,
         nargs="?",
         const=1,
         help="Number of workers",
+    )
+    parser.add_argument(
+        "--vault-address",
+        type=str,
+        default=Defaults.vault_address,
+        nargs="?",
+        const=1,
+        help="Vault address",
     )
 
     args = vars(parser.parse_args())

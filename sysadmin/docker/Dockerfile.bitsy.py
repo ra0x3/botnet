@@ -24,6 +24,6 @@ RUN ./venv/bin/pip install -r requirements/requirements.txt
 
 EXPOSE 8000
 
-CMD exec ./venv/bin/python3.9 main.py --pg_host ${PG_HOST} --pg_port ${PG_PORT} --pg_user ${PG_USER} --pg_password ${PG_PASSWORD} --pg_database ${PG_DATABASE}
+CMD exec ./venv/bin/python3.9 main.py --api-host "${API_HOST}" --api-port "${API_PORT}" --pg-host "${PG_HOST}" --pg-port "${PG_PORT}" --pg-user "${PG_USER}" --pg-password "${PG_PASSWORD}"
 
-# docker run -it -p 8000:8000 -e "PG_HOST=6.tcp.ngrok.io" -e "PG_PORT=19705" -e "PG_USER=postgres" -e "pg_database=bitsy" bitsy/py:latest
+# docker run -it -p 8000:8000 -e "PG_HOST=6.tcp.ngrok.io" -e "PG_PORT=19705" -e "PG_USER=postgres" -e "pg_database=bitsy" ralston3/bitsy:py-latest

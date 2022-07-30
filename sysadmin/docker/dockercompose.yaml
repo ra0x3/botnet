@@ -1,35 +1,44 @@
 version: "3.9"  # optional since v1.27.0
 services:
-  bitsy-api:
-    image: bitsy/py:latest
+  bitsy-vault:
+    image: ralston3/bitsy:vault-latest
     environment:
-      - ENV=dev
+      - ENV=prod
+    env_file: ./../../env/.env.prod
+    ports:
+      - "8002:8002"
+    volumes:
+      - .:/usr/local/bitsy-vault
+      - logvolume01:/var/log
+  bitsy-py:
+    image: ralston3/bitsy:py-latest
+    env_file: ./../../env/.env.prod
+    environment:
+      - ENV=prod
       - PG_HOST=${PG_HOST}
       - PG_PORT=${PG_PORT}
+      - PG_PASSWORD=${PG_PASSWORD}
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
     ports:
       - "8000:8000"
     volumes:
-      - .:/usr/local
-      - logvolume01:/var/log
-  bitsy-vault:
-    image: bitsy/vault:latest
-    environment:
-      - ENV=dev
-    env_file: ./../env/.env.dev
-    ports:
-      - "8001:8001"
-    volumes:
-      - .:/usr/local
+      - .:/usr/local/bitsy-py
       - logvolume01:/var/log
   bitsy-rs:
-    image: bitsy/rs:latest
+    image: ralston3/bitsy:rs-latest
     environment:
-      - ENV=dev
-    env_file: ./../env/.env.dev
+      - ENV=prod
+      - PG_HOST=${PG_HOST}
+      - PG_PORT=${PG_PORT}
+      - PG_PASSWORD=${PG_PASSWORD}
+      - HOST=0.0.0.0
+      - PORT=8080
+    env_file: ./../../env/.env.prod
     ports:
-      - "8001:8001"
+      - "8080:8080"
     volumes:
-      - .:/usr/local
+      - .:/usr/local/bitsy-rs
       - logvolume01:/var/log
 volumes:
   logvolume01: {}
