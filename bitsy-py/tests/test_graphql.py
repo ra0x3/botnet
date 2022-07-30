@@ -79,7 +79,7 @@ class TestGraphQLApi(BaseTestClass):
         assert data["cid"] == document.cid
 
         ciphertext = data["blob"]["data"]
-        hexkey = keystore.get_bytes(document.key_img)
+        hexkey = keystore.get_hex(document.key_img)
         fernet = fernet_from(unhexlify(hexkey))
         assert fernet.decrypt(encode(ciphertext, Encoding.UTF8)) == encode(xml_doc, Encoding.UTF8)
 

@@ -1,0 +1,13 @@
+keystore_provider: memory
+vault_address: null
+log_level: DEBUG
+log_file: bitsy.log
+workers: 3
+api_host: 127.0.0.1
+api_port: 8000
+pg_database: "bitsy"
+pg_user: "postgres"
+pg_password: "postgres"
+pg_host: "127.0.0.1"
+pg_port: "5432"
+env: ci

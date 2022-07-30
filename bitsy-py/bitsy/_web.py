@@ -109,10 +109,14 @@ app = FastAPI()
 
 
 origins = [
-    "http://127.0.0.1",
+    "http://0.0.0.0:3000",
+    "http://0.0.0.0",
     "http://127.0.0.1:3000",
-    "http://localhost",
+    "http://127.0.0.1",
+    "http://host.docker.internal:3000",
+    "http://host.docker.internal",
     "http://localhost:3000",
+    "http://localhost",
 ]
 
 

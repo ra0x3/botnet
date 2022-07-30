@@ -6,12 +6,15 @@ import AccessToken from './../models/AccessToken';
 import Account from './../models/Account';
 import TopNavigation from './../components/TopNavigation';
 import {httpRequest} from '../utils';
+import {ActionState} from '../global';
+import Loading from './../components/Loading';
 import Session from '../services/Session';
 
 interface AccessTokenItemProps {
   token: AccessToken;
   removeAccessTokenItem: any;
   updateAccessTokenItem: any;
+  updateAccessTokenActionState: any;
   account: Account;
 }
 
@@ -23,9 +26,12 @@ const AccessTokenItem = ({
   token,
   removeAccessTokenItem,
   updateAccessTokenItem,
+  updateAccessTokenActionState,
   account,
 }: AccessTokenItemProps) => {
   const toggleAccessTokenActive = async (token: AccessToken, account: Account) => {
+    updateAccessTokenActionState(ActionState.pending);
+
     const {data, error} = await httpRequest({
       url: '/access-token',
       method: 'PUT',
@@ -39,6 +45,7 @@ const AccessTokenItem = ({
 
     if (error) {
       alert(`Could not update access token.`);
+      updateAccessTokenActionState(ActionState.error);
       console.error(`Could not update access token: `, error);
     }
 
@@ -108,6 +115,7 @@ interface AccessTokensViewState {
   items: Array<AccessToken>;
   showAddAccessTokenModal: boolean;
   currentAccessToken: CurrentAccessTokenItemProps;
+  accessTokenActionState: ActionState;
 }
 
 class AccessTokensView extends React.Component<AccessTokensViewProps, AccessTokensViewState> {
@@ -120,13 +128,16 @@ class AccessTokensView extends React.Component<AccessTokensViewProps, AccessToke
         name: '',
       },
       items: [],
+      accessTokenActionState: ActionState.none,
     };
 
     this.removeAccessTokenItem = this.removeAccessTokenItem.bind(this);
     this.updateAccessTokenItem = this.updateAccessTokenItem.bind(this);
+    this.updateAccessTokenActionState = this.updateAccessTokenActionState.bind(this);
   }
 
   async componentDidMount() {
+    this.setState({ accessTokenActionState: ActionState.pending });
     const {data, error} = await httpRequest({
       url: '/access-token',
       method: 'GET',
@@ -137,11 +148,18 @@ class AccessTokensView extends React.Component<AccessTokensViewProps, AccessToke
 
     if (error) {
       alert(`Failed to fetch tokens`);
-      this.setState({items: []});
+      this.setState({items: [], accessTokenActionState: ActionState.error});
       return;
     }
 
-    this.setState({items: data.sort((a: AccessToken, b: AccessToken) => a.expiry < b.expiry )});
+    this.setState({
+      items: data.sort((a: AccessToken, b: AccessToken) => a.expiry < b.expiry),
+      accessTokenActionState: ActionState.success,
+    });
+  }
+
+  updateAccessTokenActionState(state: ActionState) {
+    this.setState({accessTokenActionState: state});
   }
 
   updateAccessTokenItem(token: AccessToken) {
@@ -149,7 +167,7 @@ class AccessTokensView extends React.Component<AccessTokensViewProps, AccessToke
     const index = this.state.items.findIndex(findWebhook);
     const items = this.state.items;
     items[index] = token;
-    this.setState({items});
+    this.setState({items, accessTokenActionState: ActionState.success});
   }
 
   removeAccessTokenItem(token: AccessToken) {
@@ -183,8 +201,6 @@ class AccessTokensView extends React.Component<AccessTokensViewProps, AccessToke
     this.setState({items: [...this.state.items, token]}, () => {
       this.setState({showAddAccessTokenModal: false});
     });
-
-    throw Error;
   }
 
   renderAddAccessTokenModal() {
@@ -241,6 +257,7 @@ class AccessTokensView extends React.Component<AccessTokensViewProps, AccessToke
         <AccessTokenItem
           key={String(i)}
           token={item}
+          updateAccessTokenActionState={this.updateAccessTokenActionState}
           updateAccessTokenItem={this.updateAccessTokenItem}
           removeAccessTokenItem={this.removeAccessTokenItem}
           account={this.state.account}
@@ -258,14 +275,21 @@ class AccessTokensView extends React.Component<AccessTokensViewProps, AccessToke
           flexDirection={'column'}
           sx={{border: '1px solid black', width: 600, height: 800, padding: 10}}
         >
-          <Button
-            sx={{width: 100, cursor: 'pointer', position: 'relative', right: 0}}
-            onClick={() => this.setState({showAddAccessTokenModal: true})}
-          >
-            Add
-          </Button>
-          {this.renderAddAccessTokenModal()}
-          {this.renderFlatList()}
+          {this.state.accessTokenActionState === ActionState.pending ? (
+            <Loading sx={{marginTop: 50}} />
+          ) : (
+            <>
+              {' '}
+              <Button
+                sx={{width: 100, cursor: 'pointer', position: 'relative', right: 0}}
+                onClick={() => this.setState({showAddAccessTokenModal: true})}
+              >
+                Add
+              </Button>
+              {this.renderAddAccessTokenModal()}
+              {this.renderFlatList()}
+            </>
+          )}
         </Flex>
       </Flex>
     );

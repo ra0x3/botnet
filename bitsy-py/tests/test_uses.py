@@ -55,8 +55,8 @@ class TestUsesCases(BaseTestClass):
         assert doc.blob.data == get_doc.blob.data
         assert doc.key_img is not None
 
-        key = keystore.get_bytes(doc.key_img)
-        assert isinstance(key, bytes)
+        key = keystore.get_hex(doc.key_img)
+        assert isinstance(key, str)
 
     def test_grant_perms_on_new_doc_for_third_party(self, keypair):
         account = create_account(keypair.pubkey)
@@ -151,8 +151,8 @@ class TestUsesCases(BaseTestClass):
         )
         updated_doc = third_party_access_document_id(party.uuid, document.cid, account.address)
 
-        hexkey = keystore.get_bytes(updated_doc.key_img)
-        assert isinstance(hexkey, bytes)
+        hexkey = keystore.get_hex(updated_doc.key_img)
+        assert isinstance(hexkey, str)
 
         fernet = fernet_from(unhexlify(hexkey))
         plaintext = fernet.decrypt(encode(updated_doc.blob.data, Encoding.UTF8))
@@ -220,8 +220,8 @@ class TestUsesCases(BaseTestClass):
         # .update_with_new_blob() updates original key_img pointer
         assert updated_doc.key_img == document.key_img
 
-        hexkey = keystore.get_bytes(updated_doc.key_img)
-        assert isinstance(hexkey, bytes)
+        hexkey = keystore.get_hex(updated_doc.key_img)
+        assert isinstance(hexkey, str)
 
         fernet = fernet_from(unhexlify(hexkey))
         plaintext = fernet.decrypt(encode(updated_doc.blob.data, Encoding.UTF8))

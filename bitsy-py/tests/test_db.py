@@ -1,6 +1,7 @@
 from bitsy._db import *
 from bitsy._models import *
 from bitsy._utils import *
+from bitsy._config import *
 
 
 class TestIndex:
@@ -36,7 +37,7 @@ class TestColumn:
 
 class TestTable:
     def setup_method(self):
-        self.conn = create_postgres_conn("bitsy", "postgres", "", "localhost", "5432")
+        self.conn = BitsyConfig.connection
 
     def test_can_create_basic_table(self):
         table = Table(

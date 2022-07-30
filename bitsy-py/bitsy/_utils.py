@@ -27,6 +27,13 @@ def env_var(key: str) -> Any:
     return os.environ[key]
 
 
+def env_var_with_default(key: str, default: Any) -> Any:
+    try:
+        return env_var(key)
+    except KeyError as err:
+        return default
+
+
 def is_pytest_session() -> bool:
     return "pytest" in sys.modules
 
@@ -52,7 +59,7 @@ def load_dot_env():
     pwd = os.environ["PWD"]
     env_name = env_with_default()
     env_path = os.path.join(os.path.dirname(pwd), "env", f".env.{env_name}")
-    print("Using env file at %s", env_path)
+    print("Using env file at {}".format(env_path))
     load_dotenv(env_path)
 
 

@@ -7,6 +7,8 @@ import TopNavigation from '../components/TopNavigation';
 import Session from '../services/Session';
 import Account from '../models/Account';
 import {httpRequest} from '../utils';
+import {ActionState} from '../global';
+import Loading from './../components/Loading';
 import SettingsMetadata from '../etc/settings.json';
 import inflection from 'inflection';
 
@@ -17,10 +19,19 @@ interface SettingItemProps {
   metadata: {[key: string]: string};
   account: Account;
   updateSettingItem: any;
+  updateSettingActionState: any;
 }
 
-const SettingItem = ({setting, metadata, account, updateSettingItem}: SettingItemProps) => {
+const SettingItem = ({
+  setting,
+  metadata,
+  account,
+  updateSettingItem,
+  updateSettingActionState,
+}: SettingItemProps) => {
   const toggleSettingActive = async (setting: Setting, acount: Account) => {
+    updateSettingActionState(ActionState.pending);
+
     const {data, error} = await httpRequest({
       url: '/setting',
       method: 'PUT',
@@ -71,6 +82,7 @@ interface SettingsViewState {
   items: Array<Setting>;
   account: Account;
   query: string;
+  settingActionState: ActionState;
 }
 
 class SettingsView extends React.Component<SettingsViewProps, SettingsViewState> {
@@ -80,12 +92,16 @@ class SettingsView extends React.Component<SettingsViewProps, SettingsViewState>
       items: [],
       account: Session.getSession(),
       query: '',
+      settingActionState: ActionState.none,
     };
 
     this.updateSettingItem = this.updateSettingItem.bind(this);
+    this.updateSettingActionState = this.updateSettingActionState.bind(this);
   }
 
   async componentDidMount() {
+    this.setState({settingActionState: ActionState.pending});
+
     const {data, error} = await httpRequest({
       url: '/setting',
       method: 'GET',
@@ -97,10 +113,18 @@ class SettingsView extends React.Component<SettingsViewProps, SettingsViewState>
     if (error) {
       alert(`Could not get settings.`);
       console.error(`Could not get settings `, error);
+      this.setState({settingActionState: ActionState.error});
       return;
     }
 
-    this.setState({items: data.sort((x: Setting, y: Setting) => x.key > y.key)});
+    this.setState({
+      items: data.sort((x: Setting, y: Setting) => x.key > y.key),
+      settingActionState: ActionState.success,
+    });
+  }
+
+  updateSettingActionState(state: ActionState) {
+    this.setState({settingActionState: state});
   }
 
   updateSettingItem(setting: Setting) {
@@ -117,6 +141,7 @@ class SettingsView extends React.Component<SettingsViewProps, SettingsViewState>
       return (
         <SettingItem
           updateSettingItem={this.updateSettingItem}
+          updateSettingActionState={this.updateSettingActionState}
           account={this.state.account}
           key={String(i)}
           setting={item}
@@ -177,7 +202,11 @@ class SettingsView extends React.Component<SettingsViewProps, SettingsViewState>
                 flexDirection={'column'}
                 sx={{border: '1px solid black', width: 600, height: 800, padding: 10}}
               >
-                {this.renderFlatList()}
+                {this.state.settingActionState === ActionState.pending ? (
+                  <Loading sx={{marginTop: 50}} />
+                ) : (
+                  <>{this.renderFlatList()}</>
+                )}
               </Flex>
             </Flex>
           </Flex>
