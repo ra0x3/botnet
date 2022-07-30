@@ -1,7 +1,6 @@
 import yaml
 import enum
 import argparse
-import copy
 import datetime as dt
 import os
 import json
@@ -134,7 +133,7 @@ def parse_args() -> Dict[str, Any]:
         help="Environment",
     )
     parser.add_argument(
-        "--api_host",
+        "--api-host",
         type=str,
         default=Defaults.api_host,
         nargs="?",
@@ -142,7 +141,7 @@ def parse_args() -> Dict[str, Any]:
         help="Web API host",
     )
     parser.add_argument(
-        "--api_port",
+        "--api-port",
         type=int,
         default=Defaults.api_port,
         nargs="?",
@@ -150,7 +149,7 @@ def parse_args() -> Dict[str, Any]:
         help="Web API port",
     )
     parser.add_argument(
-        "--pg_database",
+        "--pg-database",
         type=str,
         default=Defaults.pg_database,
         nargs="?",
@@ -158,7 +157,7 @@ def parse_args() -> Dict[str, Any]:
         help="Postgres database",
     )
     parser.add_argument(
-        "--pg_user",
+        "--pg-user",
         type=str,
         default=Defaults.pg_user,
         nargs="?",
@@ -166,7 +165,7 @@ def parse_args() -> Dict[str, Any]:
         help="Postgres user",
     )
     parser.add_argument(
-        "--pg_password",
+        "--pg-password",
         type=str,
         default=Defaults.pg_password,
         nargs="?",
@@ -174,7 +173,7 @@ def parse_args() -> Dict[str, Any]:
         help="Postgres password",
     )
     parser.add_argument(
-        "--pg_host",
+        "--pg-host",
         type=str,
         default=Defaults.pg_host,
         nargs="?",
@@ -182,7 +181,7 @@ def parse_args() -> Dict[str, Any]:
         help="Postgres host",
     )
     parser.add_argument(
-        "--pg_port",
+        "--pg-port",
         type=str,
         default=Defaults.pg_port,
         nargs="?",
@@ -198,7 +197,7 @@ def parse_args() -> Dict[str, Any]:
         help="Number of workers",
     )
     parser.add_argument(
-        "--vault-adddress",
+        "--vault-address",
         type=str,
         default=Defaults.vault_address,
         nargs="?",

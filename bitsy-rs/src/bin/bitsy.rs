@@ -28,15 +28,15 @@ pub struct Args {
     host: String,
     #[clap(long, help = "Webserver port", default_value = "8080")]
     port: String,
-    #[clap(long, help = "Posgres host", default_value = "127.0.0.1")]
+    #[clap(long, help = "Postgres host", default_value = "127.0.0.1")]
     pg_host: String,
-    #[clap(long, help = "Posgres port", default_value = "5432")]
+    #[clap(long, help = "Postgres port", default_value = "5432")]
     pg_port: String,
-    #[clap(long, help = "Posgres user", default_value = "postgres")]
+    #[clap(long, help = "Postgres user", default_value = "postgres")]
     pg_user: String,
-    #[clap(long, help = "Posgres password", default_value = "")]
-    pg_password: String,
-    #[clap(long, help = "Posgres database", default_value = "bitsy")]
+    #[clap(long, help = "Postgres password")]
+    pg_password: Option<String>,
+    #[clap(long, help = "Postgres database", default_value = "bitsy")]
     pg_database: String,
 }
 
@@ -76,9 +76,11 @@ async fn main() {
 
     let opt = Args::from_args();
 
+    let pg_passwd = opt.pg_password.unwrap_or_else(|| "".to_string());
+
     let db_url = format!(
         "postgres://{}:{}@{}:{}/{}",
-        opt.pg_user, opt.pg_password, opt.pg_host, opt.pg_port, opt.pg_database
+        opt.pg_user, pg_passwd, opt.pg_host, opt.pg_port, opt.pg_database
     );
     let db = Arc::new(Mutex::new(Database::new(&db_url).unwrap()));
 
