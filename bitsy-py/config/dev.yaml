@@ -1,4 +1,4 @@
-keystore_provider: memory
+keystore_provider: vault
 vault_address: http://127.0.0.1:8200
 log_level: DEBUG
 log_file: bitsy.log

@@ -27,6 +27,13 @@ def env_var(key: str) -> Any:
     return os.environ[key]
 
 
+def env_var_with_default(key: str, default: Any) -> Any:
+    try:
+        return env_var(key)
+    except KeyError as err:
+        return default
+
+
 def is_pytest_session() -> bool:
     return "pytest" in sys.modules
 

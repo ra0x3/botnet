@@ -4,14 +4,17 @@ import {TrashOutline} from 'react-ionicons';
 import {Label, Input, Switch, Select} from '@rebass/forms';
 import Webhook, {WebhookType} from './../models/Webhook';
 import TopNavigation from './../components/TopNavigation';
+import Loading from './../components/Loading';
 import {httpRequest} from '../utils';
 import Account from '../models/Account';
+import {ActionState} from '../global';
 import Session from '../services/Session';
 
 interface WebhookItemProps {
   webhook: Webhook;
   removeWebhookItem: any;
   updateWebhookItem: any;
+  updateWebhookActionState: any;
   account: Account;
 }
 
@@ -26,9 +29,12 @@ const WebhookItem = ({
   webhook,
   removeWebhookItem,
   updateWebhookItem,
+  updateWebhookActionState,
   account,
 }: WebhookItemProps) => {
   const toggleWebhookActive = async (webhook: Webhook, account: Account) => {
+    updateWebhookActionState(ActionState.pending);
+
     const {data, error} = await httpRequest({
       url: '/webhook',
       method: 'PUT',
@@ -42,6 +48,7 @@ const WebhookItem = ({
 
     if (error) {
       alert(`Could not update webhook.`);
+      updateWebhookActionState(ActionState.error);
       console.error(`Could not update webhook: `, error);
     }
 
@@ -115,6 +122,7 @@ interface WebhooksViewState {
   items: Array<Webhook>;
   showAddWebhookModal: boolean;
   currentWebhook: CurrentWebhookItemProps;
+  webhookActionState: ActionState;
 }
 
 class WebhooksView extends React.Component<WebhooksViewProps, WebhooksViewState> {
@@ -130,13 +138,17 @@ class WebhooksView extends React.Component<WebhooksViewProps, WebhooksViewState>
         active: false,
       },
       items: [],
+      webhookActionState: ActionState.none,
     };
 
     this.removeWebhookItem = this.removeWebhookItem.bind(this);
     this.updateWebhookItem = this.updateWebhookItem.bind(this);
+    this.updateWebhookActionState = this.updateWebhookActionState.bind(this);
   }
 
   async componentDidMount() {
+    this.setState({webhookActionState: ActionState.pending});
+
     const {data, error} = await httpRequest({
       url: '/webhook',
       method: 'GET',
@@ -147,11 +159,15 @@ class WebhooksView extends React.Component<WebhooksViewProps, WebhooksViewState>
 
     if (error) {
       alert(`Failed to fetch webhooks`);
-      this.setState({items: []});
+      this.setState({items: [], webhookActionState: ActionState.error});
       return;
     }
 
-    this.setState({items: data});
+    this.setState({items: data, webhookActionState: ActionState.success});
+  }
+
+  updateWebhookActionState(state: ActionState) {
+    this.setState({webhookActionState: state});
   }
 
   updateWebhookItem(webhook: Webhook) {
@@ -159,7 +175,7 @@ class WebhooksView extends React.Component<WebhooksViewProps, WebhooksViewState>
     const index = this.state.items.findIndex(findWebhook);
     const items = this.state.items;
     items[index] = webhook;
-    this.setState({items});
+    this.setState({items, webhookActionState: ActionState.success});
   }
 
   removeWebhookItem(webhook: Webhook) {
@@ -172,6 +188,8 @@ class WebhooksView extends React.Component<WebhooksViewProps, WebhooksViewState>
   }
 
   async saveCurrentWebhook() {
+    this.setState({webhookActionState: ActionState.pending});
+
     const {data, error} = await httpRequest({
       url: '/webhook',
       method: 'POST',
@@ -185,13 +203,14 @@ class WebhooksView extends React.Component<WebhooksViewProps, WebhooksViewState>
 
     if (error) {
       console.log(`Failed to add webhook: `, error);
+      this.setState({webhookActionState: ActionState.error});
       alert(error);
       return null;
     }
 
     const webhook = Webhook.fromObject(data);
     this.setState({items: [...this.state.items, webhook]}, () => {
-      this.setState({showAddWebhookModal: false});
+      this.setState({showAddWebhookModal: false, webhookActionState: ActionState.success});
     });
 
     throw Error;
@@ -287,6 +306,7 @@ class WebhooksView extends React.Component<WebhooksViewProps, WebhooksViewState>
         <WebhookItem
           key={String(i)}
           webhook={item}
+          updateWebhookActionState={this.updateWebhookActionState}
           removeWebhookItem={this.removeWebhookItem}
           updateWebhookItem={this.updateWebhookItem}
           account={this.state.account}
@@ -304,14 +324,21 @@ class WebhooksView extends React.Component<WebhooksViewProps, WebhooksViewState>
           flexDirection={'column'}
           sx={{border: '1px solid black', width: 600, height: 800, padding: 10}}
         >
-          <Button
-            sx={{width: 100, cursor: 'pointer', position: 'relative', right: 0}}
-            onClick={() => this.setState({showAddWebhookModal: true})}
-          >
-            Add
-          </Button>
-          {this.renderAddWebhookModal()}
-          {this.renderFlatList()}
+          {this.state.webhookActionState === ActionState.pending ? (
+            <Loading sx={{marginTop: 50}} />
+          ) : (
+            <>
+              {' '}
+              <Button
+                sx={{width: 100, cursor: 'pointer', position: 'relative', right: 0}}
+                onClick={() => this.setState({showAddWebhookModal: true})}
+              >
+                Add
+              </Button>
+              {this.renderAddWebhookModal()}
+              {this.renderFlatList()}
+            </>
+          )}
         </Flex>
       </Flex>
     );

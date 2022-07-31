@@ -5,12 +5,7 @@ use axum::{
     Router,
 };
 use bitsy::{
-    bitsy_diesel::{
-        prelude::*,
-    },
-    database::{Database},
-    models::{Account},
-    tables::{accounts::dsl::*},
+    bitsy_diesel::prelude::*, database::Database, models::Account, tables::accounts::dsl::*,
 };
 use clap::Parser;
 use serde::Deserialize;

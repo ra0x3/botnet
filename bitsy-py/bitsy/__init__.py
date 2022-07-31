@@ -101,7 +101,7 @@ server = Server(
             },
         },
         # debug=config.env == Environment.Development.value,
-        debug=True
+        debug=True,
     ),
 )
 

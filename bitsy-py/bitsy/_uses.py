@@ -201,7 +201,7 @@ def create_document_for_account(data: str, account: Account) -> Document:
     )
     document = Document(cid, DocumentBlob(ciphertext), account, bundle.key_img)
     document.save()
-    _ = keystore.put_bytes(bundle.hexkey)
+    _ = keystore.put_hex(bundle.hexkey)
     return document
 
 
@@ -245,7 +245,7 @@ def third_party_access_document_id(
 
     document = perm.document
 
-    hexkey = keystore.get_bytes(document.key_img)
+    hexkey = keystore.get_hex(document.key_img)
     bundle = fernet_bundle(unhexlify(hexkey))
     plaintext = decode(
         bundle.key.decrypt(encode(document.blob.data, Encoding.UTF8)),
@@ -256,7 +256,7 @@ def third_party_access_document_id(
 
     new_key_bytes = pbkdf2hmac_kdf(bundle.key_bytes)
     new_bundle = fernet_bundle(new_key_bytes)
-    keystore.put_bytes(new_bundle.hexkey)
+    keystore.put_hex(new_bundle.hexkey)
     new_blob = decode(
         new_bundle.key.encrypt(encode(document.blob.data, Encoding.UTF8)),
         Encoding.UTF8,
@@ -407,7 +407,7 @@ def update_existing_doc_for_account(
         update={"blob": document.blob.data, "key_image": document.key_img},
         where={"cid": document.cid, "account_address": account.address},
     )
-    _ = keystore.put_bytes(bundle.hexkey)
+    _ = keystore.put_hex(bundle.hexkey)
     return doc
 
 

@@ -584,6 +584,7 @@ class Permission(BaseModel):
         columns=[
             Column("uuid", ColumnType.Varchar, unique=True),
             Column("key", ColumnType.Varchar),
+            # TODO: Possibly store multiple document IDs in single perm
             Column(
                 "document_cid",
                 ColumnType.Varchar,

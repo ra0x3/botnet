@@ -126,23 +126,15 @@ class BaseConnection:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def get_bytes(self, id: str) -> bytes:
-        raise NotImplementedError
-
-    @abc.abstractmethod
     def put_key(self, key: PublicKey):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def put_bytes(self, key: bytes):
+    def get_hex(self, id: str) -> str:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def ids(self) -> List[str]:
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def keys(self) -> List[PublicKey]:
+    def put_hex(self, key: str):
         raise NotImplementedError
 
 
@@ -153,23 +145,17 @@ class InMemoryConnection(BaseConnection):
     def get_key(self, id: str) -> PublicKey:
         return self._store[id]
 
-    def get_bytes(self, id: str) -> bytes:
-        return self._store[id]
-
     def put_key(self, key: PublicKey):
         hexkey = key.to_hex()
         key_img = key_image(hexkey)
         self._store[key_img] = hexkey
 
-    def put_bytes(self, key: bytes):
+    def get_hex(self, id: str) -> str:
+        return self._store[id]
+
+    def put_hex(self, key: str):
         key_img = key_image(decode(key, Encoding.UTF8))
         self._store[key_img] = key
-
-    def ids(self) -> List[str]:
-        return self._store.keys()
-
-    def keys(self) -> List[PublicKey]:
-        return self._store.values()
 
 
 class VaultConnection(BaseConnection):
@@ -182,10 +168,6 @@ class VaultConnection(BaseConnection):
         response = self._store.secrets.kv.v2.read_secret(id)
         return response["data"]["data"]["key"]
 
-    def get_bytes(self, id: str) -> bytes:
-        response = self._store.secrets.kv.v2.read_secret(id)
-        return encode(response["data"]["data"]["key"], Encoding.UTF8)
-
     def put_key(self, key: PublicKey):
         hexkey = key.to_hex()
         key_img = key_image(hexkey)
@@ -193,17 +175,15 @@ class VaultConnection(BaseConnection):
             key_img, secret={"key": hexkey}
         )
 
-    def put_bytes(self, key: bytes):
+    def get_hex(self, id: str) -> str:
+        response = self._store.secrets.kv.v2.read_secret(id)
+        return encode(response["data"]["data"]["key"], Encoding.UTF8)
+
+    def put_hex(self, key: str):
         key_img = key_image(key)
         self._store.secrets.kv.v2.create_or_update_secret(
             key_img, secret={"key": decode(key, Encoding.UTF8)}
         )
-
-    def ids(self) -> List[str]:
-        return self._store.keys()
-
-    def keys(self) -> List[PublicKey]:
-        return self._store.values()
 
 
 _Connection = TypeVar(
@@ -229,14 +209,14 @@ class KeyStore_:
     def get_key(self, id: str) -> PublicKey:
         return self._store.get_key(id)
 
-    def get_bytes(self, id: str) -> bytes:
-        return self._store.get_bytes(id)
+    def get_hex(self, id: str) -> bytes:
+        return self._store.get_hex(id)
 
     def put_key(self, key: PublicKey):
         self._store.put_key(key)
 
-    def put_bytes(self, key: bytes):
-        self._store.put_bytes(key)
+    def put_hex(self, key: bytes):
+        self._store.put_hex(key)
 
 
 keystore = KeyStore_(BitsyConfig)

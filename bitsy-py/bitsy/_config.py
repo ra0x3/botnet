@@ -36,15 +36,17 @@ class Defaults:
     api_host: str = "127.0.0.1"
     api_port: int = 8000
     env: str = env_with_default()
+    jwt_secret: str = "77388623176251186746484687673521814216112263525741856083147157640482304445455"
     log_file: str = "bitsy.log"
     log_level: LogLevel = LogLevel.DEBUG
-    pg_database: str = "bitsy"
-    pg_host: str = "127.0.0.1"
-    pg_password: str = ""
-    pg_port: str = "5432"
-    pg_user: str = "postgres"
+    pg_database: str = env_var_with_default("PG_DATABASE", "bitsy")
+    pg_host: str = env_var_with_default("PG_HOST", "127.0.0.1")
+    pg_password: str = env_var_with_default("PG_PASSWORD", "")
+    pg_port: str = env_var_with_default("PG_PORT", "5432")
+    pg_user: str = env_var_with_default("PG_USER", "postgres")
     vault_address: str = "http://127.0.0.1:8200"
     workers: int = 3
+    keystore_provider: KeyStoreProvider = KeyStoreProvider.InMemory.value
 
 
 class BitsyConfig:
@@ -53,8 +55,8 @@ class BitsyConfig:
     env: str = Defaults.env
     jwt_algo: str = "HS256"
     jwt_expiry_days: str = "90"
-    jwt_secret: str = env_var("JWT_SECRET")
-    keystore_provider: KeyStoreProvider = KeyStoreProvider.Vault.value
+    jwt_secret: str = env_var_with_default("JWT_SECRET", Defaults.jwt_secret)
+    keystore_provider: KeyStoreProvider = KeyStoreProvider.InMemory.value
     log_file: str = Defaults.log_file
     log_level: LogLevel = LogLevel.DEBUG
     pg_database: str = Defaults.pg_database
@@ -87,7 +89,7 @@ class BitsyConfig:
         path = os.path.join(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
             "config",
-            f"bitsy.{BitsyConfig.env}.yaml",
+            f"{BitsyConfig.env}.yaml",
         )
         return BitsyConfig._load_config(path)
 

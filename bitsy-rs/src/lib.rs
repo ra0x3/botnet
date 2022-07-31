@@ -2,7 +2,6 @@
 extern crate diesel;
 extern crate diesel_codegen;
 
-
 pub mod bitsy_diesel {
     pub mod prelude {
         pub use diesel::prelude::*;
@@ -93,9 +92,7 @@ pub mod tables {
 pub mod models {
 
     use super::tables::{accounts, documents};
-    use diesel::{
-        Insertable, Queryable, QueryableByName,
-    };
+    use diesel::{Insertable, Queryable, QueryableByName};
     use serde::{Deserialize, Serialize};
 
     #[derive(

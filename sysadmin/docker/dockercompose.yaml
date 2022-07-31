@@ -1,7 +1,10 @@
 version: "3.9"  # optional since v1.27.0
 services:
   bitsy-vault:
-    image: ralston3/bitsy:vault-latest
+    build:
+      dockerfile: ./Dockerfile.bitsy.vault
+    cap_add:
+      - IPC_LOCK
     environment:
       - ENV=prod
     env_file: ./../../env/.env.prod
@@ -25,6 +28,10 @@ services:
     volumes:
       - .:/usr/local/bitsy-py
       - logvolume01:/var/log
+    depends_on:
+      - bitsy-vault
+    links:
+      - "bitsy-vault"
   bitsy-rs:
     image: ralston3/bitsy:rs-latest
     environment:
@@ -40,5 +47,24 @@ services:
     volumes:
       - .:/usr/local/bitsy-rs
       - logvolume01:/var/log
+    depends_on:
+      - bitsy-py
+  bitsy-www:
+    image: ralston3/bitsy:www-latest
+    environment:
+      - ENV=prod
+      - REACT_APP_PROTOCOL=http
+      - REACT_APP_BITSY_API_HOST=bitsy-rs
+      - REACT_APP_BITSY_API_PORT=8000
+    env_file: ./../../env/.env.prod
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/usr/local/bitsy-www
+      - logvolume01:/var/log
+    depends_on:
+      - bitsy-py
+    links:
+      - "bitsy-vault"
 volumes:
   logvolume01: {}

@@ -66,7 +66,7 @@ class TestWeb(BaseTestClass):
             )
         )
 
-        hexkey = keystore.get_bytes(document.key_img)
+        hexkey = keystore.get_hex(document.key_img)
 
         key = fernet_from(unhexlify(hexkey))
 
