@@ -20,7 +20,8 @@ RUN apt install -y \
 COPY . .
 
 RUN python3.9 -m venv venv
-RUN ./venv/bin/pip install -r requirements/requirements.txt
+RUN ./venv/bin/pip install pipenv
+RUN ./venv/bin/pipenv install --deploy --dev
 
 EXPOSE 8000
 

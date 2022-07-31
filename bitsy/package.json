@@ -8,7 +8,7 @@
     "start": "react-native start",
     "test": "jest",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
-    "pretty": "prettier --config .prettierrc.js 'src/**/*.{js,tsx,css}' --write"
+    "pretty": "prettier --config .prettierrc.js '**/*.{js,tsx,css}' --write"
   },
   "dependencies": {
     "@react-navigation/native": "^6.0.11",
