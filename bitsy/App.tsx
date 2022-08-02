@@ -16,28 +16,10 @@ import {
   LearnMoreLinks,
   ReloadInstructions,
 } from 'react-native/Libraries/NewAppScreen';
+import TabNavigator from './src/router';
 
 const App = () => {
-  const [count, incrementCount] = useState(0);
-
-  return (
-    <SafeAreaView>
-      <StatusBar />
-      <View
-        style={{
-          height: '100%',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-        }}
-      >
-        <View style={{justifyContent: 'center', alignItems: 'center', display: 'flex'}}>
-          <Button mode='outlined' onPress={() => incrementCount(count + 1)} style={{ borderWidth: 2}}>Count</Button>
-          <Text style={{ marginTop: 20 }}>Count is now {count}</Text>
-        </View>
-      </View>
-    </SafeAreaView>
-  );
+  return <TabNavigator />;
 };
 
 const styles = StyleSheet.create({
