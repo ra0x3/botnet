@@ -51,7 +51,7 @@ class TestWeb(BaseTestClass):
         account = create_account(keypair.pubkey)
         response = self.client.post(
             "/document",
-            json={"data": "Attack at dawn!"},
+            json={"name": "My doc", "data": "Attack at dawn!"},
             headers={"Authorization": account.jwt},
         )
         assert response.status_code == status.HTTP_200_OK
@@ -60,6 +60,7 @@ class TestWeb(BaseTestClass):
         document = Document.from_row(
             (
                 rjson["cid"],
+                rjson["name"],
                 rjson["blob"]["data"],
                 rjson["account"]["address"],
                 rjson["key_img"],
@@ -71,6 +72,7 @@ class TestWeb(BaseTestClass):
         key = fernet_from(unhexlify(hexkey))
 
         assert isinstance(document.cid, str)
+        assert document.name == "My doc"
         assert key.decrypt(encode(document.blob.data, Encoding.UTF8)) == b"Attack at dawn!"
 
     def test_route_new_access_token_for_third_party(self, keypair):
@@ -101,10 +103,11 @@ class TestWeb(BaseTestClass):
         account = create_account(keypair.pubkey)
         party = create_third_party()
         _ = new_access_token_for_third_party(party)
-        document = create_document_for_account(xml_doc, account)
+        document = create_document_for_account("doc", xml_doc, account)
         response = self.client.post(
             "/permission",
             json={
+                "name": "my doc",
                 "permission_key": PermissionKey.Read.value,
                 "party_ids": [party.uuid],
                 "document_cid": document.cid,
@@ -133,7 +136,7 @@ class TestWeb(BaseTestClass):
         account = create_account(keypair.pubkey)
         party = create_third_party()
         _ = new_access_token_for_third_party(party)
-        document = create_document_for_account(xml_doc, account)
+        document = create_document_for_account("doc", xml_doc, account)
 
         response = self.client.get(
             "/account-stats",
@@ -221,7 +224,7 @@ class TestWeb(BaseTestClass):
     def test_route_revoke_perms_on_existing_doc_for_third_party_id(self, keypair, xml_doc):
         account = create_account(keypair.pubkey)
         party = create_third_party()
-        document = create_document_for_account(xml_doc, account)
+        document = create_document_for_account("another doc", xml_doc, account)
         perm = grant_perms_on_existing_doc_for_third_party(
             PermissionKey.Read, party, account, document
         )
@@ -273,3 +276,43 @@ class TestWeb(BaseTestClass):
         assert response.status_code == status.HTTP_200_OK
         result = self.get_from_db(f"SELECT * FROM webhooks WHERE uuid = '{webhook.uuid}'")
         assert not result
+
+    def test_route_create_third_party_access_request_id(self, xml_doc):
+        from .conftest import keypair_func
+
+        keypair1 = keypair_func()
+        keypair2 = keypair_func()
+        party_acct = create_third_party_account(keypair1.pubkey)
+        account = create_account(keypair2.pubkey)
+        document = create_document_for_account("something", xml_doc, account)
+
+        response = self.client.post(
+            "/access-request",
+            json={
+                "account_address": account.address,
+                "document_cid": document.cid,
+                "callback_url": "https://foo.com",
+                "callback_data": {"foo": "bar"},
+            },
+            headers={"Authorization": party_acct.account.jwt},
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        rjson = response.json()
+        request = AccessRequest.from_row(
+            (
+                rjson["uuid"],
+                rjson["third_party"]["uuid"],
+                rjson["account"]["address"],
+                rjson["document"]["cid"],
+                rjson["status"],
+                rjson["callback_url"],
+                json.dumps(rjson["callback_data"]),
+                rjson["created_at"],
+                rjson["expiry"],
+            )
+        )
+
+        assert isinstance(request.uuid, str)
+        assert request.status == AccessRequestStatus.Pending
+        assert request.expiry > request.created_at

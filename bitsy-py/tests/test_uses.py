@@ -44,7 +44,7 @@ class TestUsesCases(BaseTestClass):
 
     def test_can_create_store_get_document(self, xml_doc, keypair):
         account = create_account(keypair.pubkey)
-        doc = create_document_for_account(xml_doc, account)
+        doc = create_document_for_account("another doc", xml_doc, account)
         assert isinstance(doc, Document)
 
         result = self.get_from_db(f"SELECT * FROM documents WHERE cid = '{doc.cid}';")
@@ -63,7 +63,7 @@ class TestUsesCases(BaseTestClass):
         party = create_third_party()
         _ = create_access_token_for_third_party(party)
         perm = grant_perms_on_new_doc_for_third_party(
-            PermissionKey.Other, party, "hello world", account, 12
+            PermissionKey.Other, party, "my doc", "hello world", account, 12
         )
 
         result = self.get_from_db(
@@ -77,11 +77,11 @@ class TestUsesCases(BaseTestClass):
 
     def test_grant_perms_on_existing_doc_for_third_party(self, keypair):
         account = create_account(keypair.pubkey)
-        doc = create_document_for_account("hello world", account)
+        doc = create_document_for_account("important doc", "hello world", account)
         party = create_third_party()
         _ = create_access_token_for_third_party(party)
         perm = grant_perms_on_new_doc_for_third_party(
-            PermissionKey.Other, party, doc.blob.data, account, 12
+            PermissionKey.Other, party, "another doc", doc.blob.data, account, 12
         )
 
         perm = grant_perms_on_existing_doc_for_third_party(PermissionKey.Other, party, account, doc)
@@ -113,7 +113,7 @@ class TestUsesCases(BaseTestClass):
         party = create_third_party()
         _ = create_access_token_for_third_party(party)
         perm = grant_perms_on_new_doc_for_third_party(
-            PermissionKey.Other, party, "hello world", account, 12
+            PermissionKey.Other, party, "doc-123", "hello world", account, 12
         )
 
         updated_perm = revoke_third_party_perms_on_account(PermissionKey.Other, account, party)
@@ -131,7 +131,7 @@ class TestUsesCases(BaseTestClass):
             _ = create_access_token_for_third_party(party)
 
             _ = grant_perms_on_new_doc_for_third_party(
-                PermissionKey.Other, party, "hello world", account, 12
+                PermissionKey.Other, party, "herodoc", "hello world", account, 12
             )
 
         perms = list_all_third_party_perms_for_account(account)
@@ -145,7 +145,7 @@ class TestUsesCases(BaseTestClass):
     def test_third_party_access_document_id(self, keypair, xml_doc):
         account = create_account(keypair.pubkey)
         party = create_third_party()
-        document = create_document_for_account(xml_doc, account)
+        document = create_document_for_account("my doc", xml_doc, account)
         _ = grant_perms_on_existing_doc_for_third_party(
             PermissionKey.Read, party, account, document
         )
@@ -161,7 +161,7 @@ class TestUsesCases(BaseTestClass):
     def test_get_stats_for_account(self, keypair, xml_doc):
         account = create_account(keypair.pubkey)
         party = create_third_party()
-        document = create_document_for_account(xml_doc, account)
+        document = create_document_for_account("foo", xml_doc, account)
         _ = grant_perms_on_existing_doc_for_third_party(
             PermissionKey.Read, party, account, document
         )
@@ -196,7 +196,7 @@ class TestUsesCases(BaseTestClass):
     def test_revoke_perms_on_existing_doc_for_third_party(self, keypair, xml_doc):
         account = create_account(keypair.pubkey)
         party = create_third_party()
-        document = create_document_for_account(xml_doc, account)
+        document = create_document_for_account("doc-543", xml_doc, account)
         perm = grant_perms_on_existing_doc_for_third_party(
             PermissionKey.Read, party, account, document
         )
@@ -211,7 +211,7 @@ class TestUsesCases(BaseTestClass):
 
     def test_update_existing_doc_for_account(self, keypair, xml_doc):
         account = create_account(keypair.pubkey)
-        document = create_document_for_account(xml_doc, account)
+        document = create_document_for_account("important", xml_doc, account)
 
         new_blob = "Hello, world!"[::-1]
         updated_doc = update_existing_doc_for_account(account, new_blob, document)
@@ -247,3 +247,23 @@ class TestUsesCases(BaseTestClass):
 
         assert isinstance(get_account.party, ThirdParty)
         assert isinstance(get_account.account, Account)
+
+    def test_can_create_third_party_access_request(self, xml_doc):
+        from .conftest import keypair_func
+
+        keypair1 = keypair_func()
+        keypair2 = keypair_func()
+        party_acct = create_third_party_account(keypair1.pubkey)
+        account = create_account(keypair2.pubkey)
+        document = create_document_for_account("something", xml_doc, account)
+
+        request = create_third_party_access_request(
+            party_acct.party, account, document, "https://foo.com", {"foo": "bar", "baz": "zoo"}
+        )
+
+        results = self.get_from_db(f"SELECT * FROM access_requests WHERE uuid = '{request.uuid}';")
+        assert len(results) == 1
+
+        assert isinstance(request.uuid, str)
+        assert request.callback_url == "https://foo.com"
+        assert request.callback_data == {"foo": "bar", "baz": "zoo"}

@@ -24,6 +24,7 @@ class _table_name(enum.Enum):
     settings = "settings"
     webhooks = "webhooks"
     third_party_accounts = "third_party_accounts"
+    access_requests = "access_requests"
 
 
 class SettingKey(enum.Enum):
@@ -677,6 +678,7 @@ class Document(BaseModel):
         _table_name.documents.value,
         columns=[
             Column("cid", ColumnType.Varchar, unique=True),
+            Column("name", ColumnType.Varchar),
             Column("blob", ColumnType.Bytea),
             Column(
                 "account_address",
@@ -694,11 +696,13 @@ class Document(BaseModel):
     def __init__(
         self,
         cid: str,
+        name: str,
         blob: DocumentBlob,
         account: Account,
         key_img: str = SQL_NULL,
     ):
         self.cid = cid
+        self.name = name
         self.blob = blob
         self.account = account
         self.key_img = key_img
@@ -706,16 +710,18 @@ class Document(BaseModel):
     def to_row(self) -> Tuple[Any]:
         return (
             quote(self.cid),
+            quote(self.name),
             quote(self.blob.decode()),
             quote(self.account.address),
             quote(self.key_img),
         )
 
     def from_row(row: Tuple[Any]) -> "Document":
-        (cid, blob, account_address, key_img) = row
+        (cid, name, blob, account_address, key_img) = row
         account = Account.get(where={"address": account_address})
         return Document(
             cid,
+            name,
             DocumentBlob(decode(blob, Encoding.UTF8)),
             account,
             key_img,
@@ -868,6 +874,118 @@ class Webhook(BaseModel):
         )
 
 
+class AccessRequestStatus(enum.Enum):
+    Pending = "Pending"
+    Denied = "Denied"
+    Granted = "Granted"
+
+
+class AccessRequest(BaseModel):
+    table = Table(
+        _table_name.access_requests.value,
+        columns=[
+            Column("uuid", ColumnType.Varchar, unique=True),
+            Column(
+                "third_party_id",
+                ColumnType.Varchar,
+                foreign_key=ForeignKey(
+                    "third_party_id",
+                    reference=ForeignKeyReference("third_parties", "uuid"),
+                ),
+            ),
+            Column(
+                "account_address",
+                ColumnType.Varchar,
+                foreign_key=ForeignKey(
+                    "account_address",
+                    reference=ForeignKeyReference("accounts", "address"),
+                ),
+            ),
+            Column(
+                "document_cid",
+                ColumnType.Varchar,
+                foreign_key=ForeignKey(
+                    "document_cid",
+                    reference=ForeignKeyReference("documents", "cid"),
+                ),
+            ),
+            Column("status", ColumnType.Varchar),
+            Column("callback_url", ColumnType.Varchar),
+            Column("callback_data", ColumnType.Varchar),
+            Column("created_at", ColumnType.Integer),
+            Column("expiry", ColumnType.Integer),
+        ],
+        conn=config.connection,
+    )
+
+    def __init__(
+        self,
+        uuid: str,
+        third_party: ThirdParty,
+        account: Account,
+        document: Document,
+        status: AccessRequestStatus,
+        callback_url: str,
+        callback_data: Dict[str, str],
+        created_at: int = now(),
+        expiry: int = now() + 60 * 60 * 24,  # 24-hour expiry
+    ):
+        self.uuid = uuid
+        self.third_party = third_party
+        self.account = account
+        self.document = document
+        self.status = status
+        self.callback_url = callback_url
+        self.callback_data = callback_data
+        self.created_at = created_at
+        self.expiry = expiry
+
+    def to_row(self) -> Tuple[Any]:
+        return (
+            quote(self.uuid),
+            quote(self.third_party.uuid),
+            quote(self.account.address),
+            quote(self.document.cid),
+            quote(self.status.value),
+            quote(self.callback_url),
+            quote(json.dumps(self.callback_data)),
+            quote(self.created_at),
+            quote(self.expiry),
+        )
+
+    @staticmethod
+    def from_row(row: Tuple[Any]) -> "AccessRequest":
+        (
+            uuid,
+            third_party_id,
+            account_address,
+            document_cid,
+            status,
+            callback_url,
+            callback_data,
+            created_at,
+            expiry,
+        ) = row
+        party = ThirdParty.get(where={"uuid": third_party_id})
+        account = Account.get(where={"address": account_address})
+        document = Document.get(where={"cid": document_cid})
+        return AccessRequest(
+            uuid,
+            party,
+            account,
+            document,
+            AccessRequestStatus[status],
+            callback_url,
+            json.loads(callback_data),
+            created_at,
+            expiry,
+        )
+
+    @staticmethod
+    def create():
+        AccessRequest.table.create()
+
+
 class Model:
     AccessToken = AccessToken
     ThirdParty = ThirdParty
@@ -877,3 +995,4 @@ class Model:
     Setting = Setting
     Webhook = Webhook
     ThirdPartyAccount = ThirdPartyAccount
+    AccessRequest = AccessRequest

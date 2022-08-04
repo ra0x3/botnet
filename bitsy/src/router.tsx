@@ -1,12 +1,13 @@
 import React from 'react';
 import 'react-native-gesture-handler';
-import BaseView from './views/BaseView';
 import AccessRequestsView from './views/AccessRequestsView';
 import FeedView from './views/FeedView';
 import AccountView from './views/AccountView';
 import SignupView from './views/SignupView';
 import LoginView from './views/LoginView';
 import DocumentsView from './views/DocumentsView';
+import FocusDocumentView from './views/FocusDocumentView';
+import FocusAccessRequestView from './views/FocusAccessRequestView';
 import SettingsView from './views/SettingsView';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import {NavigationContainer} from '@react-navigation/native';
@@ -29,6 +30,9 @@ const StackNavigator = () => {
       >
         <Stack.Screen name="Login" component={LoginView} />
         <Stack.Screen name="Signup" component={SignupView} />
+        <Stack.Screen name="Settings" component={SettingsView} />
+        <Stack.Screen name="FocusedDocument" component={FocusDocumentView} />
+        <Stack.Screen name="FocusAccessRequest" component={FocusAccessRequestView} />
         <Stack.Screen name="Tabs" component={TabNavigator} />
       </Stack.Navigator>
     </NavigationContainer>
@@ -45,20 +49,22 @@ const TabNavigator = () => {
 
           switch (route.name) {
             case 'Feed':
-              iconname = 'ios-grid-outline';
+              iconname = 'ios-grid';
               break;
             case 'AccessRequests':
-              iconname = 'ios-chatbubble-outline';
+              iconname = 'ios-chatbubble';
               break;
             case 'Documents':
-              iconname = 'ios-document-outline';
+              iconname = 'ios-document';
               break;
             case 'Account':
-              iconname = 'ios-person-circle-outline';
+              iconname = 'ios-person-circle';
               break;
             default:
-              iconname = 'ios-airplane-outline';
+              iconname = 'ios-airplane';
           }
+
+          iconname = focused ? iconname : `${iconname}-outline`;
 
           return <Ionicons name={iconname} size={size} color={focused ? color.cobalt : dcolor} />;
         },
@@ -77,18 +83,3 @@ const TabNavigator = () => {
 };
 
 export default StackNavigator;
-
-// const RootNavigator = createStackNavigator(
-//   {
-//     Root: {
-//       screen: TabNavigator,
-//       navigationOptions: {
-//         headerMode: "none"
-//       }
-//     },
-//     /* Other Screens */
-//     Login: { screen: LoginView },
-//   }
-// )
-
-// export default TabNavigator;

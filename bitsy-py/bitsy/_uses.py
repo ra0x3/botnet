@@ -193,21 +193,27 @@ def update_account_keys(
 
 
 @use_case
-def create_document_for_account(data: str, account: Account) -> Document:
+def create_document_for_account(
+    name: str, data: str, account: Account
+) -> Document:
     cid = blake3_(uuid4())
     bundle = fernet_bundle()
     ciphertext = decode(
         bundle.key.encrypt(encode(data, Encoding.UTF8)), Encoding.UTF8
     )
-    document = Document(cid, DocumentBlob(ciphertext), account, bundle.key_img)
+    document = Document(
+        cid, name, DocumentBlob(ciphertext), account, bundle.key_img
+    )
     document.save()
     _ = keystore.put_hex(bundle.hexkey)
     return document
 
 
-def create_document_for_account_id(account_address: str, data: str) -> Document:
+def create_document_for_account_id(
+    name: str, account_address: str, data: str
+) -> Document:
     account = Account.get(where={"address": account_address})
-    return create_document_for_account(data, account)
+    return create_document_for_account(name, data, account)
 
 
 @use_case
@@ -274,11 +280,12 @@ def third_party_access_document_id(
 def grant_perms_on_new_doc_for_third_party(
     key: PermissionKey,
     party: ThirdParty,
+    name: str,
     data: str,
     account: Account,
     ttl: int,
 ) -> Permission:
-    document = create_document_for_account(data, account)
+    document = create_document_for_account(name, data, account)
     permission = Permission(
         uuid4(),
         key,
@@ -295,6 +302,7 @@ def grant_perms_on_new_doc_for_third_party(
 def grant_perms_on_new_doc_for_third_party_id(
     key: PermissionKey,
     party_id: str,
+    name: str,
     data: str,
     account_address: str,
     ttl: int = -1,
@@ -302,7 +310,7 @@ def grant_perms_on_new_doc_for_third_party_id(
     account = Account.get(where={"address": account_address})
     party = ThirdParty.get(where={"uuid": party_id})
     return grant_perms_on_new_doc_for_third_party(
-        key, party, data, account, ttl
+        key, party, name, data, account, ttl
     )
 
 
@@ -464,3 +472,39 @@ def create_third_party_webhook_id(
         raise ResourceDoesNotExist("Party({}) not found.".format(party_id))
 
     return create_third_party_webhook(party, endpoint, type, name, active)
+
+
+@use_case
+def create_third_party_access_request(
+    party: ThirdPartyAccount,
+    account: Account,
+    document: Document,
+    callback_url: str,
+    callback_data: Dict[str, str],
+):
+    request = AccessRequest(
+        uuid4(),
+        party,
+        account,
+        document,
+        AccessRequestStatus.Pending,
+        callback_url,
+        callback_data,
+    )
+    request.save()
+    return request
+
+
+def create_third_party_access_request_id(
+    party_id: str,
+    account_address: str,
+    document_cid: str,
+    callback_url: str,
+    callback_data: Dict[str, str],
+) -> AccessRequest:
+    party = ThirdParty.get(where={"uuid": party_id})
+    account = Account.get(where={"address": account_address})
+    document = Document.get(where={"cid": document_cid})
+    return create_third_party_access_request(
+        party, account, document, callback_url, callback_data
+    )
