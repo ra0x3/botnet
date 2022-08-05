@@ -61,6 +61,12 @@ def keypair() -> Keypair:
     return Keypair(privkey, privkey.public_key)
 
 
+def keypair_func() -> Keypair:
+    acct = web3.eth.account.create()
+    privkey = eth_keys.keys.PrivateKey(acct._private_key)
+    return Keypair(privkey, privkey.public_key)
+
+
 @pytest.fixture
 def mnemonic() -> str:
     return RealMetamaskAcct.mnemonic

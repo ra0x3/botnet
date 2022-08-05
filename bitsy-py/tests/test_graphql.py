@@ -65,7 +65,7 @@ class TestGraphQLApi(BaseTestClass):
 
     def test_document(self, keypair, xml_doc):
         account = create_account(keypair.pubkey)
-        document = create_document_for_account(xml_doc, account)
+        document = create_document_for_account("foobar", xml_doc, account)
         response = self.client.post(
             "/graphql",
             json={
@@ -87,7 +87,7 @@ class TestGraphQLApi(BaseTestClass):
         account = create_account(keypair.pubkey)
         party = create_third_party()
         token = create_access_token_for_third_party(party)
-        document = create_document_for_account(xml_doc, account)
+        document = create_document_for_account("my doc", xml_doc, account)
         perm = grant_perms_on_existing_doc_for_third_party(
             PermissionKey.Read, party, account, document
         )

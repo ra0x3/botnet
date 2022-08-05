@@ -1,0 +1,32 @@
+{
+    "Other": {
+        "name": "Other",
+        "description": "Used for internal testing only.",
+        "account_type": "test"
+    },
+    "BitsyVaultDeletegation": {
+        "name": "BitsyVaultDeletegation",
+        "description": "Allow Bitsy to programmatically access your public key on your behalf.",
+        "account_type": "user"
+    },
+    "ProgrammaticThirdPartyAccess": {
+        "name": "ProgrammaticThirdPartyAccess",
+        "description": "Allow third parties you trust to access your data programmatically.",
+        "account_type": "user"
+    },
+    "ThirdPartyNotifications": {
+        "name": "ThirdPartyNotifications",
+        "description": "Allow third parties you trust to send you notifications for access requests.",
+        "account_type": "user"
+    },
+    "Webhooks": {
+        "name": "Webhooks",
+        "description": "Enable webhooks for your project.",
+        "account_type": "third_party"
+    },
+    "ProgrammaticWebhookAccess": {
+        "name": "ProgrammaticWebhookAccess",
+        "description": "Allow Bitsy to serve requests to your webhook endpoints programmatically.",
+        "account_type": "third_party"
+    }
+}

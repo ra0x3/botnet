@@ -51,6 +51,7 @@ class _Database:
             Setting,
             Webhook,
             ThirdPartyAccount,
+            AccessRequest,
         ]
 
         with self._conn.cursor() as _:

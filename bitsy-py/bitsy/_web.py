@@ -57,6 +57,7 @@ class DocumentBlob(BaseModel):
 @strawberry.type
 class Document(BaseModel):
     cid: str
+    name: str
     blob: DocumentBlob
     account: Account
     key_image: str
@@ -92,6 +93,17 @@ class Webhook(BaseModel):
 class ThirdPartyAccount(BaseModel):
     account: Account
     third_party: ThirdParty
+
+
+@strawberry.type
+class AccessRequest(BaseModel):
+    uuid: str
+    third_party: ThirdParty
+    account: Account
+    document: Document
+    status: str
+    callback_url: str
+    callback_data: Dict[str, str]
 
 
 class DummyRoute(APIRoute):
@@ -225,7 +237,9 @@ async def route_create_third_party(request: Request):
 async def route_create_document(request: Request):
     body = await request.json()
     doc: Document = create_document_for_account_id(
-        request.state.account.address, encode(body["data"], Encoding.UTF8)
+        body["name"],
+        request.state.account.address,
+        encode(body["data"], Encoding.UTF8),
     )
     return doc
 
@@ -310,6 +324,7 @@ async def route_grant_perms_on_doc_for_third_party(request: Request):
             perm: Permission = grant_perms_on_new_doc_for_third_party_id(
                 PermissionKey(body["permission_key"]),
                 party_id,
+                body["name"],
                 encode(body["data"], Encoding.UTF8),
                 request.state.account.address,
             )
@@ -425,6 +440,37 @@ async def route_delete_third_party_webhook_id(request: Request):
     return delete_third_party_webhook(
         request.state.party_account.party.uuid, body["uuid"]
     )
+
+
+@app.post("/access-request")
+async def route_create_third_party_access_request_id(request: Request):
+    body = await request.json()
+    return create_third_party_access_request_id(
+        request.state.party_account.party.uuid,
+        body["account_address"],
+        body["document_cid"],
+        body["callback_url"],
+        body["callback_data"],
+    )
+
+
+@app.get("/acccount/access-request")
+async def route_create_third_party_access_request_id(request: Request):
+    from ._models import AccessRequest
+
+    request = AccessRequest.get_many(
+        where={"account_address": request.state.account.address}
+    )
+    return request
+
+
+@app.get("/access-request")
+async def route_create_third_party_access_request_id(request: Request):
+    from ._models import AccessRequest
+
+    body = await request.json()
+    request = AccessRequest.get(where={"uuid": body["access_request_id"]})
+    return request
 
 
 router = APIRouter(route_class=DummyRoute)
