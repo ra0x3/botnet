@@ -58,7 +58,7 @@ class AccessRequestsViewItem extends React.Component<
             </View>
           );
         }}
-        onPress={() => navigate("FocusAccessRequest")}
+        onPress={() => navigate('FocusAccessRequest')}
       />
     );
   };
