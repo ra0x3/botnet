@@ -21,3 +21,7 @@ export const httpRequest = async (options: AxiosRequestConfig) => {
 export const now = (): number => {
   return Date.now() / 1000;
 };
+
+export function ornull<T>(x: T, test: Option<T>): Option<T> {
+  return x == test ? null : x;
+}

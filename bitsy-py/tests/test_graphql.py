@@ -49,8 +49,8 @@ class TestGraphQLApi(BaseTestClass):
         assert data["uuid"] == party.uuid
         assert data["name"] == party.name
 
-    def test_account(self, keypair):
-        account = create_account(keypair.pubkey)
+    def test_account(self, test_account):
+        account = test_account
         response = self.client.post(
             "/graphql",
             json={
@@ -63,8 +63,8 @@ class TestGraphQLApi(BaseTestClass):
         data = response.json()["data"]["account"]
         assert data["address"] == account.address
 
-    def test_document(self, keypair, xml_doc):
-        account = create_account(keypair.pubkey)
+    def test_document(self, test_account, xml_doc):
+        account = test_account
         document = create_document_for_account("foobar", xml_doc, account)
         response = self.client.post(
             "/graphql",
@@ -83,8 +83,8 @@ class TestGraphQLApi(BaseTestClass):
         fernet = fernet_from(unhexlify(hexkey))
         assert fernet.decrypt(encode(ciphertext, Encoding.UTF8)) == encode(xml_doc, Encoding.UTF8)
 
-    def test_permission(self, keypair, xml_doc):
-        account = create_account(keypair.pubkey)
+    def test_permission(self, test_account, xml_doc):
+        account = test_account
         party = create_third_party()
         token = create_access_token_for_third_party(party)
         document = create_document_for_account("my doc", xml_doc, account)

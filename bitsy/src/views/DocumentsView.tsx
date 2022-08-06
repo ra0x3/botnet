@@ -1,8 +1,9 @@
 import React from 'react';
-import {View, SafeAreaView, StatusBar, FlatList, Text} from 'react-native';
-import {Button, Portal, Dialog, Paragraph} from 'react-native-paper';
+import {View, SafeAreaView, StatusBar, FlatList, Text, TouchableOpacity} from 'react-native';
+import {Button, Portal, Dialog, Paragraph, Appbar} from 'react-native-paper';
 import {color} from '../const';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import SearchBar from '../components/SearchBar';
 import {generateFakeItems} from '../utils';
 import {NavigationProps} from '../global';
 import Account from '../models/Account';
@@ -54,24 +55,54 @@ class DocumentsViewItem extends React.Component<DocumentsViewItemProps, Document
   render = () => {
     const {item, navigate} = this.props;
     return (
-      <View
-        style={{
-          borderWidth: 1,
-          borderColor: color.light_grey,
-          width: '100%',
-          height: 100,
-        }}
-      >
-        <Text>{item.name}</Text>
-        {/* {this.renderDialogue()} */}
-        <Button onPress={() => navigate('FocusedDocument', {item})}>View</Button>
-      </View>
+      <TouchableOpacity onPress={() => navigate('FocusedDocument', {item})}>
+        <View
+          style={{
+            borderWidth: 1,
+            borderColor: color.light_grey,
+            width: '100%',
+            height: 100,
+          }}
+        >
+          <View
+            style={{
+              borderWidth: 1,
+              borderColor: 'red',
+              width: '100%',
+              display: 'flex',
+              justifyContent: 'center',
+            }}
+          >
+            <Text>{item.name}</Text>
+            <Text>{item.created_at}</Text>
+          </View>
+          <View
+            style={{
+              borderWidth: 1,
+              borderColor: 'blue',
+              width: '100%',
+              display: 'flex',
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+            }}
+          >
+            <Button
+              style={{width: 75, borderWidth: 1, height: 30}}
+              mode={'outlined'}
+              onPress={() => navigate('FocusedDocument', {item})}
+            >
+              View
+            </Button>
+          </View>
+        </View>
+      </TouchableOpacity>
     );
   };
 }
 
 interface DocumentsViewState {
   items: Array<Document>;
+  query: string;
 }
 
 interface DocumentsViewProps extends NavigationProps {}
@@ -80,13 +111,15 @@ class DocumentsView extends React.Component<DocumentsViewProps, DocumentsViewSta
   constructor(props: DocumentsViewProps) {
     super(props);
     this.state = {
+      query: '',
       items: generateFakeItems(
         new Document(
           '0x123',
           'Chase Saphire Reserve',
           new DocumentBlob('<xml>credit card</xml>'),
-          new Account('0x1234', '0x33333', 12345, '', null),
+          new Account('0x1234', '0x33333', 'password', 12345, '', null),
           '0x1234xx',
+          12345,
         ),
         20,
       ),
@@ -103,6 +136,21 @@ class DocumentsView extends React.Component<DocumentsViewProps, DocumentsViewSta
     return <DocumentsViewItem navigate={this.navigate} item={item} key={String(item.cid)} />;
   };
 
+  onSearchChange = (query: string) => {
+    this.setState({query});
+  };
+
+  filteredResults() {
+    if (this.state.query === '') {
+      return this.state.items;
+    } else {
+      const query = this.state.query.toLowerCase();
+      return this.state.items.filter((item: Document, i: number) => {
+        return item.name.toLowerCase().startsWith(query);
+      });
+    }
+  }
+
   render = () => {
     return (
       <SafeAreaView>
@@ -114,17 +162,30 @@ class DocumentsView extends React.Component<DocumentsViewProps, DocumentsViewSta
             flexDirection: 'column',
           }}
         >
-          <View style={{borderWidth: 1, borderColor: 'red', height: 100, width: '100%'}}></View>
+          <View style={{borderWidth: 1, borderColor: 'red', height: 100, width: '100%'}}>
+            <Appbar.Header>
+              <Appbar.Content title="Documents" subtitle={'Manage your documents'} />
+              <Appbar.Action
+                style={{borderWidth: 1, height: 50, width: 50}}
+                icon={() => (
+                  <Ionicons name="ios-add-circle-outline" size={25} color={color.white} />
+                )}
+                onPress={() => {}}
+              />
+            </Appbar.Header>
+            <SearchBar onChangeText={this.onSearchChange} query={this.state.query} />
+          </View>
           <View
             style={{
               display: 'flex',
               width: '100%',
               borderWidth: 1,
               borderColor: 'blue',
+              marginTop: 20,
             }}
           >
             <FlatList
-              data={this.state.items}
+              data={this.filteredResults()}
               renderItem={this.renderItem}
               keyExtractor={(item) => item.cid}
             />

@@ -458,42 +458,53 @@ class Account(BaseModel):
     table = Table(
         _table_name.accounts.value,
         columns=[
-            Column("pubkey", ColumnType.Varchar, unique=True),
             Column("address", ColumnType.Varchar, unique=True),
+            Column("password_hash", ColumnType.Varchar),
             Column("created_at", ColumnType.Integer),
             Column("nonce", ColumnType.Varchar, unique=True),
+            Column("pubkey", ColumnType.Varchar, unique=True),
         ],
         conn=config.connection,
     )
 
     def __init__(
         self,
-        pubkey: str,
         address: str,
+        password_hash: str,
         created_at: int = now(),
         nonce: Optional[str] = None,
+        pubkey: Optional[str] = None,
     ):
-        self.pubkey = pubkey
         self.address = address
+        self.password_hash = password_hash
         self.created_at = created_at
-        self.nonce = nonce
         self.jwt: Optional[str] = None
+        self.pubkey = pubkey
+        self.nonce = nonce
 
     def set_jwt(self, jwt: str):
         self.jwt = jwt
 
     def to_row(self) -> Tuple[Any]:
         nonce = quote(self.nonce) if self.nonce is not None else SQL_NULL
+        pubkey = quote(self.pubkey) if self.pubkey is not None else SQL_NULL
         return (
-            quote(self.pubkey),
             quote(self.address),
+            quote(self.password_hash),
             quote(self.created_at),
             nonce,
+            pubkey,
         )
 
     def from_row(row: Tuple[Any]) -> "Account":
-        (pubkey, address, created_at, nonce) = row
-        return Account(pubkey, address, created_at, nonce)
+        (address, password_hash, created_at, nonce, pubkey) = row
+        return Account(
+            address=address,
+            password_hash=password_hash,
+            created_at=created_at,
+            nonce=nonce,
+            pubkey=pubkey,
+        )
 
     @staticmethod
     def create():
@@ -612,6 +623,7 @@ class Permission(BaseModel):
                 ),
             ),
             Column("ttl", ColumnType.Integer, default=-1),
+            Column("created_at", ColumnType.Integer),
         ],
         conn=config.connection,
     )
@@ -625,6 +637,7 @@ class Permission(BaseModel):
         account: "Account",
         third_party: ThirdParty,
         ttl: int,
+        created_at: int = now(),
     ):
         self.uuid = uuid
         self.key = key
@@ -633,16 +646,18 @@ class Permission(BaseModel):
         self.account = account
         self.third_party = third_party
         self.ttl = ttl
+        self.created_at = created_at
 
     def to_row(self) -> Tuple[Any]:
         return (
             quote(self.uuid),
             quote(self.key.value),
             quote(self.document.cid),
-            str(self.value),
+            quote(self.value),
             quote(self.account.address),
             quote(self.third_party.uuid),
-            str(self.ttl),
+            quote(self.ttl),
+            quote(self.created_at),
         )
 
     def from_row(row: Tuple[Any]) -> "Permission":
@@ -654,6 +669,7 @@ class Permission(BaseModel):
             account_address,
             third_party_id,
             ttl,
+            created_at,
         ) = row
         document = Document.get({"cid": document_cid})
         account = Account.get({"address": account_address})
@@ -666,6 +682,7 @@ class Permission(BaseModel):
             account,
             party,
             ttl,
+            created_at,
         )
 
     @staticmethod
@@ -689,6 +706,7 @@ class Document(BaseModel):
                 ),
             ),
             Column("key_image", ColumnType.Varchar),
+            Column("creatd_at", ColumnType.Integer),
         ],
         conn=config.connection,
     )
@@ -700,12 +718,14 @@ class Document(BaseModel):
         blob: DocumentBlob,
         account: Account,
         key_img: str = SQL_NULL,
+        created_at: int = now(),
     ):
         self.cid = cid
         self.name = name
         self.blob = blob
         self.account = account
         self.key_img = key_img
+        self.created_at = created_at
 
     def to_row(self) -> Tuple[Any]:
         return (
@@ -714,10 +734,11 @@ class Document(BaseModel):
             quote(self.blob.decode()),
             quote(self.account.address),
             quote(self.key_img),
+            quote(self.created_at),
         )
 
     def from_row(row: Tuple[Any]) -> "Document":
-        (cid, name, blob, account_address, key_img) = row
+        (cid, name, blob, account_address, key_img, created_at) = row
         account = Account.get(where={"address": account_address})
         return Document(
             cid,
@@ -725,6 +746,7 @@ class Document(BaseModel):
             DocumentBlob(decode(blob, Encoding.UTF8)),
             account,
             key_img,
+            created_at,
         )
 
     @staticmethod

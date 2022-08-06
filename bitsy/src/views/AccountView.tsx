@@ -1,6 +1,7 @@
 import React from 'react';
-import {View, SafeAreaView, StatusBar, Text} from 'react-native';
+import {View, SafeAreaView, StatusBar, Text, TouchableOpacity} from 'react-native';
 import {ScrollView} from 'react-native-gesture-handler';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import {color} from '../const';
 import {NavigationProps} from '../global';
 
@@ -12,31 +13,48 @@ interface AccountListItemProps {
 
 const AccountListItem = ({style, title, onPress}: AccountListItemProps) => {
   return (
-    <View
-      style={{
-        borderWidth: 1,
-        height: 40,
-        width: '100%',
-        display: 'flex',
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: color.white,
-        ...style,
-      }}
-    >
-      <View style={{height: 30, width: 30, borderWidth: 1, padding: 5}}>
-        <Text>Icon</Text>
-      </View>
+    <TouchableOpacity onPress={onPress}>
+      <View
+        style={{
+          borderWidth: 1,
+          width: 350,
+          display: 'flex',
+          flexDirection: 'row',
+          // justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: color.white,
+          padding: 5,
+          ...style,
+        }}
+      >
+        <View
+          style={{
+            borderWidth: 1,
+            borderColor: 'green',
+            width: '95%',
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <View style={{height: '60%', width: '20%', borderWidth: 1}}>
+            <Text>Icon</Text>
+          </View>
 
-      <View style={{height: 30, width: 250, borderWidth: 1, padding: 5}}>
-        <Text>{title}</Text>
-      </View>
+          <View style={{height: '60%', width: '60%', borderWidth: 1}}>
+            <Text>{title}</Text>
+          </View>
 
-      <View style={{height: 30, width: 30, borderWidth: 1, padding: 5}}>
-        <Text>Chevron</Text>
+          <View style={{height: '60%', width: '10%', borderWidth: 1}}>
+            <TouchableOpacity>
+              <Ionicons name="ios-chevron-forward-outline" size={20} color={color.light_grey} />
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 };
 
@@ -57,35 +75,112 @@ class AccountView extends React.Component<AccountViewProps, AccountViewState> {
         <View
           style={{
             height: '100%',
+            width: '100%',
             display: 'flex',
             // alignItems: 'center',
           }}
         >
-          <ScrollView style={{display: 'flex', borderWidth: 1, borderColor: 'red', padding: 20}}>
+          <ScrollView
+            style={{
+              display: 'flex',
+              borderWidth: 1,
+              borderColor: 'red',
+              padding: 10,
+              width: '100%',
+            }}
+          >
             <Text style={{fontWeight: 'bold', fontSize: 32, marginTop: 20}}>Account</Text>
             <View
-              style={{borderWidth: 1, borderColor: 'blue', display: 'flex', alignItems: 'center'}}
+              style={{
+                borderWidth: 1,
+                borderColor: 'blue',
+                display: 'flex',
+                alignItems: 'center',
+                width: '100%',
+              }}
             >
+              <TouchableOpacity onPress={() => {}}>
+                <View
+                  style={{
+                    borderWidth: 1,
+                    width: 350,
+                    display: 'flex',
+                    flexDirection: 'row',
+                    // justifyContent: 'center',
+                    alignItems: 'center',
+                    backgroundColor: color.white,
+                    padding: 5,
+                    height: 125,
+                  }}
+                >
+                  <View
+                    style={{
+                      borderWidth: 1,
+                      borderColor: 'green',
+                      width: '95%',
+                      height: '100%',
+                      display: 'flex',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <View
+                      style={{
+                        height: '60%',
+                        width: '20%',
+                        borderWidth: 1,
+                        borderRadius: 50,
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Text>Icon</Text>
+                    </View>
+
+                    <View
+                      style={{
+                        height: '60%',
+                        width: '60%',
+                        borderWidth: 1,
+                        display: 'flex',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Text>Airplane Mode</Text>
+                    </View>
+
+                    <View
+                      style={{
+                        height: '60%',
+                        width: '10%',
+                        borderWidth: 1,
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <TouchableOpacity>
+                        <Ionicons
+                          name="ios-chevron-forward-outline"
+                          size={20}
+                          color={color.light_grey}
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              </TouchableOpacity>
               <AccountListItem
-                title={'Airplane Mode'}
-                onPress={() => {}}
-                style={{height: 100, borderRadius: 10}}
+                title={'Settings'}
+                onPress={() => this.props.navigation.navigate('Settings')}
+                style={{height: 50}}
               />
-              <AccountListItem
-                title={'Notifications'}
-                onPress={() => {}}
-                style={{
-                  height: 70,
-                  borderTopRightRadius: 10,
-                  borderTopLeftRadius: 10,
-                  marginTop: 30,
-                }}
-              />
-              <AccountListItem title={'Settings'} onPress={() => {}} style={{height: 70}} />
               <AccountListItem
                 title={'Permissions'}
-                onPress={() => {}}
-                style={{height: 70, borderBottomRightRadius: 10, borderBottomLeftRadius: 10}}
+                onPress={() => this.props.navigation.navigate('Permissions')}
+                style={{height: 50, borderBottomRightRadius: 10, borderBottomLeftRadius: 10}}
               />
             </View>
           </ScrollView>

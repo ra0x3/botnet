@@ -12,7 +12,7 @@ class TestUsesCases(BaseTestClass):
     def setup_method(self):
         self.conn = config.connection
 
-    def test_can_create_store_get_access_token(self, keypair):
+    def test_can_create_store_get_access_token(self):
         party = create_third_party("foo")
         token = create_access_token(party)
         assert isinstance(token, AccessToken)
@@ -25,7 +25,7 @@ class TestUsesCases(BaseTestClass):
 
     def test_can_create_store_get_account(self, keypair):
         keys = keypair
-        account = create_account(keys.pubkey)
+        account = create_account(pubkey=keys.pubkey, password_hash="123")
         assert isinstance(account, Account)
 
         result = self.get_from_db(f"SELECT * FROM accounts WHERE address = '{account.address}';")
@@ -42,8 +42,27 @@ class TestUsesCases(BaseTestClass):
         )
         assert len(result) == 1
 
-    def test_can_create_store_get_document(self, xml_doc, keypair):
-        account = create_account(keypair.pubkey)
+    def test_can_create_get_store_account_with_either_pubkey_or_address(self):
+        from .conftest import keypair_func
+
+        keypair = keypair_func()
+        account = create_account(pubkey=keypair.pubkey, password_hash="123")
+
+        result = Account.from_row(
+            self.get_from_db(f"SELECT * FROM accounts WHERE address = '{account.address}'")[0]
+        )
+        assert result.pubkey == account.pubkey
+
+        keypair = keypair_func()
+        account = create_account(address=keypair.address, password_hash="123")
+
+        result = Account.from_row(
+            self.get_from_db(f"SELECT * FROM accounts WHERE address = '{account.address}'")[0]
+        )
+        assert result.address == account.address
+
+    def test_can_create_store_get_document(self, xml_doc, test_account):
+        account = test_account
         doc = create_document_for_account("another doc", xml_doc, account)
         assert isinstance(doc, Document)
 
@@ -58,8 +77,8 @@ class TestUsesCases(BaseTestClass):
         key = keystore.get_hex(doc.key_img)
         assert isinstance(key, str)
 
-    def test_grant_perms_on_new_doc_for_third_party(self, keypair):
-        account = create_account(keypair.pubkey)
+    def test_grant_perms_on_new_doc_for_third_party(self, keypair, test_account):
+        account = test_account
         party = create_third_party()
         _ = create_access_token_for_third_party(party)
         perm = grant_perms_on_new_doc_for_third_party(
@@ -75,8 +94,8 @@ class TestUsesCases(BaseTestClass):
         assert perm.uuid == get_perm.uuid
         assert perm.document.blob.data == get_perm.document.blob.data
 
-    def test_grant_perms_on_existing_doc_for_third_party(self, keypair):
-        account = create_account(keypair.pubkey)
+    def test_grant_perms_on_existing_doc_for_third_party(self, keypair, test_account):
+        account = test_account
         doc = create_document_for_account("important doc", "hello world", account)
         party = create_third_party()
         _ = create_access_token_for_third_party(party)
@@ -108,8 +127,8 @@ class TestUsesCases(BaseTestClass):
 
         assert len(result) >= 1
 
-    def test_revoke_third_party_perms_on_account(self, keypair):
-        account = create_account(keypair.pubkey)
+    def test_revoke_third_party_perms_on_account(self, keypair, test_account):
+        account = test_account
         party = create_third_party()
         _ = create_access_token_for_third_party(party)
         perm = grant_perms_on_new_doc_for_third_party(
@@ -121,10 +140,10 @@ class TestUsesCases(BaseTestClass):
         assert updated_perm.value == 0
         assert updated_perm.value != perm.value
 
-    def test_list_all_third_party_perms_for_account(self, keypair):
+    def test_list_all_third_party_perms_for_account(self, keypair, test_account):
         n = 3
 
-        account = create_account(keypair.pubkey)
+        account = test_account
 
         for _ in range(n):
             party = create_third_party()
@@ -142,8 +161,8 @@ class TestUsesCases(BaseTestClass):
     def test_toggle_setting_for_account(self):
         raise NotImplementedError
 
-    def test_third_party_access_document_id(self, keypair, xml_doc):
-        account = create_account(keypair.pubkey)
+    def test_third_party_access_document_id(self, keypair, test_account, xml_doc):
+        account = test_account
         party = create_third_party()
         document = create_document_for_account("my doc", xml_doc, account)
         _ = grant_perms_on_existing_doc_for_third_party(
@@ -158,8 +177,8 @@ class TestUsesCases(BaseTestClass):
         plaintext = fernet.decrypt(encode(updated_doc.blob.data, Encoding.UTF8))
         assert plaintext == encode(xml_doc, Encoding.UTF8)
 
-    def test_get_stats_for_account(self, keypair, xml_doc):
-        account = create_account(keypair.pubkey)
+    def test_get_stats_for_account(self, keypair, test_account, xml_doc):
+        account = test_account
         party = create_third_party()
         document = create_document_for_account("foo", xml_doc, account)
         _ = grant_perms_on_existing_doc_for_third_party(
@@ -172,8 +191,8 @@ class TestUsesCases(BaseTestClass):
         assert stats.account_age == 0
         assert stats.perm_count == 1
 
-    def test_add_setting_to_account(self, keypair):
-        account = create_account(keypair.pubkey)
+    def test_add_setting_to_account(self, keypair, test_account):
+        account = test_account
         setting = add_setting_to_account(account, SettingKey.Other, 1)
         assert isinstance(setting, Setting)
         assert setting.account.address == account.address
@@ -185,16 +204,16 @@ class TestUsesCases(BaseTestClass):
 
         assert get_setting.enabled()
 
-    def test_toggle_account_setting(self, keypair):
-        account = create_account(keypair.pubkey)
+    def test_toggle_account_setting(self, keypair, test_account):
+        account = test_account
         setting = add_setting_to_account(account, SettingKey.Other, 1)
         assert setting.enabled()
 
         updated_setting = toggle_account_setting(account, SettingKey.Other)
         assert updated_setting.disabled()
 
-    def test_revoke_perms_on_existing_doc_for_third_party(self, keypair, xml_doc):
-        account = create_account(keypair.pubkey)
+    def test_revoke_perms_on_existing_doc_for_third_party(self, keypair, test_account, xml_doc):
+        account = test_account
         party = create_third_party()
         document = create_document_for_account("doc-543", xml_doc, account)
         perm = grant_perms_on_existing_doc_for_third_party(
@@ -209,8 +228,8 @@ class TestUsesCases(BaseTestClass):
         get_perm = self.get_from_db(f"SELECT * FROM permissions WHERE uuid = '{perm.uuid}';")
         assert not get_perm
 
-    def test_update_existing_doc_for_account(self, keypair, xml_doc):
-        account = create_account(keypair.pubkey)
+    def test_update_existing_doc_for_account(self, keypair, test_account, xml_doc):
+        account = test_account
         document = create_document_for_account("important", xml_doc, account)
 
         new_blob = "Hello, world!"[::-1]
@@ -236,8 +255,8 @@ class TestUsesCases(BaseTestClass):
         get_webhook = Webhook.from_row(results[0])
         assert not get_webhook.active
 
-    def test_create_third_party_account(self, keypair):
-        party_acct = create_third_party_account(keypair.pubkey)
+    def test_create_third_party_account(self, test_party_account):
+        party_acct = test_party_account
         assert isinstance(party_acct, ThirdPartyAccount)
 
         result = self.get_from_db(
@@ -248,13 +267,10 @@ class TestUsesCases(BaseTestClass):
         assert isinstance(get_account.party, ThirdParty)
         assert isinstance(get_account.account, Account)
 
-    def test_can_create_third_party_access_request(self, xml_doc):
-        from .conftest import keypair_func
+    def test_can_create_third_party_access_request(self, xml_doc, test_account, test_party_account):
 
-        keypair1 = keypair_func()
-        keypair2 = keypair_func()
-        party_acct = create_third_party_account(keypair1.pubkey)
-        account = create_account(keypair2.pubkey)
+        party_acct = test_party_account
+        account = test_account
         document = create_document_for_account("something", xml_doc, account)
 
         request = create_third_party_access_request(

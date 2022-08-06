@@ -7,3 +7,7 @@ export const generateFakeItems = (item: any, count: number): Array<any> => {
 
   return items;
 };
+
+export const booleanify = (x: number): boolean => {
+  return x === 0 ? false : true;
+};

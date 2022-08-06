@@ -42,11 +42,12 @@ class AccessToken(BaseModel):
 
 @strawberry.type
 class Account(BaseModel):
-    pubkey: str
     address: str
+    password_hash: str
     created_at: int
     nonce: Optional[str]
     jwt: Optional[str]
+    pubkey: Optional[str]
 
 
 @strawberry.type
@@ -61,6 +62,7 @@ class Document(BaseModel):
     blob: DocumentBlob
     account: Account
     key_image: str
+    created_at: int
 
 
 @strawberry.type
@@ -71,6 +73,7 @@ class Permission(BaseModel):
     value: int
     account: Account
     third_party: ThirdParty
+    created_at: int
 
 
 @strawberry.type
@@ -222,14 +225,20 @@ async def route_create_third_party(request: Request):
 @app.post("/account/third-party")
 async def route_create_third_party(request: Request):
     body = await request.json()
-    pubkey = recover_pubkey_from_compressed_hex(body["pubkey"])
-    if pubkey.to_checksum_address() != to_checksum_address(body["address"]):
-        raise RequestError(
-            "Address dervied from the public key recovered from this mnemonic, and the address included in this request do not match. '{}' != '{}'".format(
-                pubkey.to_address(), to_checksum_address(body["address"])
+    address = body.get("address")
+    pubkey = body.get("pubkey")
+
+    if pubkey:
+        pubkey = recover_pubkey_from_compressed_hex(body["pubkey"])
+        if pubkey.to_checksum_address() != to_checksum_address(body["address"]):
+            raise RequestError(
+                "Address dervied from the public key recovered from this mnemonic, and the address included in this request do not match. '{}' != '{}'".format(
+                    pubkey.to_address(), to_checksum_address(body["address"])
+                )
             )
-        )
-    party: ThirdParty = create_third_party_account(pubkey)
+    party: ThirdParty = create_third_party_account(
+        pubkey=pubkey, address=address
+    )
     return party
 
 
@@ -281,15 +290,20 @@ async def route_delete_third_party_access_token(request: Request):
 @app.post("/account")
 async def route_create_account(request: Request):
     body = await request.json()
-    pubkey = recover_pubkey_from_compressed_hex(body["pubkey"])
-    if pubkey.to_checksum_address() != to_checksum_address(body["address"]):
-        raise RequestError(
-            "Address dervied from the public key recovered from this mnemonic, and the address included in this request do not match. '{}' != '{}'".format(
-                pubkey.to_address(), to_checksum_address(body["address"])
+    pubkey = body.get("pubkey")
+    address = body.get("address")
+
+    if pubkey:
+        pubkey = recover_pubkey_from_compressed_hex(body["pubkey"])
+        if pubkey.to_checksum_address() != to_checksum_address(body["address"]):
+            raise RequestError(
+                "Address dervied from the public key recovered from this mnemonic, and the address included in this request do not match. '{}' != '{}'".format(
+                    pubkey.to_address(), to_checksum_address(body["address"])
+                )
             )
-        )
-    account: Account = create_account(pubkey)
-    return account
+    return create_account(
+        pubkey=pubkey, password_hash=body["password_hash"], address=address
+    )
 
 
 @app.post("/account/auth/verify")

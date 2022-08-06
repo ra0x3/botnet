@@ -1,8 +1,9 @@
 import React from 'react';
-import {View, SafeAreaView, StatusBar, FlatList, Text} from 'react-native';
+import {View, SafeAreaView, StatusBar, FlatList, TouchableOpacity} from 'react-native';
 import {List} from 'react-native-paper';
 import {color} from '../const';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import SearchBar from '../components/SearchBar';
 import FeedItem, {FeedItemType} from './../models/FeedItem';
 import {generateFakeItems} from '../utils';
 import {NavigationProps} from '../global';
@@ -70,6 +71,7 @@ class FeedViewItem extends React.Component<FeedViewItemProps, FeedViewItemState>
 
 interface FeedViewState {
   items: Array<FeedItem>;
+  query: string;
 }
 
 interface FeedViewProps extends NavigationProps {}
@@ -78,6 +80,7 @@ class FeedView extends React.Component<FeedViewProps, FeedViewState> {
   constructor(props: FeedViewProps) {
     super(props);
     this.state = {
+      query: '',
       items: generateFakeItems(
         new FeedItem(
           'Foo',
@@ -101,6 +104,24 @@ class FeedView extends React.Component<FeedViewProps, FeedViewState> {
     return <FeedViewItem navigate={this.navigate} item={item} key={String(item.id())} />;
   };
 
+  onSearchChange = (query: string) => {
+    this.setState({query});
+  };
+
+  filteredResults() {
+    if (this.state.query === '') {
+      return this.state.items;
+    } else {
+      const query = this.state.query.toLowerCase();
+      return this.state.items.filter((item: FeedItem, i: number) => {
+        return (
+          item.title.toLowerCase().startsWith(query) ||
+          item.subtitle.toLowerCase().startsWith(query)
+        );
+      });
+    }
+  }
+
   render = () => {
     return (
       <SafeAreaView>
@@ -112,7 +133,9 @@ class FeedView extends React.Component<FeedViewProps, FeedViewState> {
             flexDirection: 'column',
           }}
         >
-          <View style={{borderWidth: 1, borderColor: 'red', height: 100, width: '100%'}}></View>
+          <View style={{borderWidth: 1, borderColor: 'red', height: 100, width: '100%'}}>
+            <SearchBar onChangeText={this.onSearchChange} query={this.state.query} />
+          </View>
           <View
             style={{
               display: 'flex',
@@ -122,7 +145,7 @@ class FeedView extends React.Component<FeedViewProps, FeedViewState> {
             }}
           >
             <FlatList
-              data={this.state.items}
+              data={this.filteredResults()}
               renderItem={this.renderItem}
               keyExtractor={(item) => item.id()}
             />
