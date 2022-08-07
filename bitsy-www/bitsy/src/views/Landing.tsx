@@ -1,8 +1,8 @@
 import React from 'react';
 import Web3 from '../services/Web3';
 import {Flex, Box, Text, Button} from 'rebass';
-import {Input, Label} from '@rebass/forms';
-import {httpRequest, routeTo} from '../utils';
+import {Input, Label, Textarea} from '@rebass/forms';
+import {httpRequest, routeTo, ornull} from '../utils';
 import Session from '../services/Session';
 import {TEST_MNEMONIC} from '../const';
 import Account from '../models/Account';
@@ -13,30 +13,11 @@ interface LandingViewState {
   showSignupModal: boolean;
   showLoginModal: boolean;
   currentPartyName: string;
+  currentPartyAddress: string;
   mnemonic: {
     [key: number]: string;
   };
 }
-
-interface MnemonicWordProps {
-  position: number;
-  updateMnemonicState: any;
-  value: string;
-}
-
-const MnemonicWord = ({value, position, updateMnemonicState}: MnemonicWordProps) => {
-  return (
-    <Box sx={{border: '1px solid red', width: 100, borderRadius: 10}}>
-      <Label>{position}</Label>
-      <Input
-        value={value}
-        onChange={(e) => {
-          updateMnemonicState(position, e.target.value);
-        }}
-      />
-    </Box>
-  );
-};
 
 class LandingView extends React.Component<LandingViewProps, LandingViewState> {
   constructor(props: LandingViewProps) {
@@ -45,6 +26,7 @@ class LandingView extends React.Component<LandingViewProps, LandingViewState> {
       showSignupModal: false,
       showLoginModal: false,
       currentPartyName: '',
+      currentPartyAddress: '',
       mnemonic: (() => {
         let result: {[key: number]: string} = {};
         for (let i = 1; i < 25; i++) {
@@ -55,7 +37,7 @@ class LandingView extends React.Component<LandingViewProps, LandingViewState> {
     };
 
     this.handleCloseSignupModal = this.handleCloseSignupModal.bind(this);
-    this.updateMnemonicState = this.updateMnemonicState.bind(this);
+    this.updateCredentialState = this.updateCredentialState.bind(this);
   }
 
   componentDidMount() {
@@ -72,11 +54,11 @@ class LandingView extends React.Component<LandingViewProps, LandingViewState> {
     this.setState({showSignupModal: false});
   }
 
-  updateMnemonicState(position: number, word: string) {
-    this.setState({mnemonic: {...this.state.mnemonic, [position]: word}});
+  updateCredentialState(key: string, value: string) {
+    this.setState({[key]: value} as any);
   }
 
-  async submitmnemonic() {
+  async submitCredentials() {
     const mnemonic = Object.values(this.state.mnemonic).join(' ');
     const account = Web3.loadWalletFromMnemonic(TEST_MNEMONIC);
     if (!account) {
@@ -88,9 +70,9 @@ class LandingView extends React.Component<LandingViewProps, LandingViewState> {
       url: '/account/third-party',
       method: 'POST',
       data: {
-        name: this.state.currentPartyName === '' ? null : this.state.currentPartyName,
-        pubkey: account!.publicKey,
-        address: account!.address,
+        name: ornull(this.state.currentPartyName, ''),
+        // pubkey: ornull(account.publicKey, ''),
+        address: ornull(this.state.currentPartyAddress, ''),
       },
     });
 
@@ -125,7 +107,11 @@ class LandingView extends React.Component<LandingViewProps, LandingViewState> {
             >
               Close Modal
             </Button>
-            <Flex sx={{width: '100%'}} alignItems={'center'} justifyContent={'center'}>
+            <Flex
+              flexDirection={'column'}
+              justifyContent={'space-between'}
+              sx={{border: '1px solid blue', width: 600, padding: 50}}
+            >
               <Flex sx={{border: '1px solid red'}} flexDirection={'column'}>
                 <Label>Name</Label>
                 <Input
@@ -133,151 +119,46 @@ class LandingView extends React.Component<LandingViewProps, LandingViewState> {
                   onChange={(e) => this.setState({currentPartyName: e.target.value})}
                 />
               </Flex>
-            </Flex>
-            <Flex
-              flexDirection={'column'}
-              justifyContent={'space-between'}
-              sx={{border: '1px solid blue', width: 600, padding: 50}}
-            >
-              <Flex sx={{marginBottom: 20}} justifyContent={'space-between'}>
-                <MnemonicWord
-                  value={this.state.mnemonic[1]}
-                  position={1}
-                  updateMnemonicState={this.updateMnemonicState}
-                />
-                <MnemonicWord
-                  value={this.state.mnemonic[2]}
-                  position={2}
-                  updateMnemonicState={this.updateMnemonicState}
-                />
-                <MnemonicWord
-                  value={this.state.mnemonic[3]}
-                  position={3}
-                  updateMnemonicState={this.updateMnemonicState}
-                />
-                <MnemonicWord
-                  value={this.state.mnemonic[4]}
-                  position={4}
-                  updateMnemonicState={this.updateMnemonicState}
+              <Flex sx={{border: '1px solid red'}} flexDirection={'column'}>
+                <Label>Address</Label>
+                <Input
+                  value={this.state.currentPartyAddress}
+                  onChange={(e) => this.setState({currentPartyAddress: e.target.value})}
                 />
               </Flex>
-              <Flex sx={{marginBottom: 20}} justifyContent={'space-between'}>
-                <MnemonicWord
-                  value={this.state.mnemonic[5]}
-                  position={5}
-                  updateMnemonicState={this.updateMnemonicState}
-                />
-                <MnemonicWord
-                  value={this.state.mnemonic[6]}
-                  position={6}
-                  updateMnemonicState={this.updateMnemonicState}
-                />
-                <MnemonicWord
-                  value={this.state.mnemonic[7]}
-                  position={7}
-                  updateMnemonicState={this.updateMnemonicState}
-                />
-                <MnemonicWord
-                  value={this.state.mnemonic[8]}
-                  position={8}
-                  updateMnemonicState={this.updateMnemonicState}
-                />
-              </Flex>
-              <Flex sx={{marginBottom: 20}} justifyContent={'space-between'}>
-                <MnemonicWord
-                  value={this.state.mnemonic[9]}
-                  position={9}
-                  updateMnemonicState={this.updateMnemonicState}
-                />
-                <MnemonicWord
-                  value={this.state.mnemonic[10]}
-                  position={10}
-                  updateMnemonicState={this.updateMnemonicState}
-                />
-                <MnemonicWord
-                  value={this.state.mnemonic[11]}
-                  position={11}
-                  updateMnemonicState={this.updateMnemonicState}
-                />
-                <MnemonicWord
-                  value={this.state.mnemonic[12]}
-                  position={12}
-                  updateMnemonicState={this.updateMnemonicState}
-                />
-              </Flex>
-              <Flex sx={{marginBottom: 20}} justifyContent={'space-between'}>
-                <MnemonicWord
-                  value={this.state.mnemonic[13]}
-                  position={13}
-                  updateMnemonicState={this.updateMnemonicState}
-                />
-                <MnemonicWord
-                  value={this.state.mnemonic[14]}
-                  position={14}
-                  updateMnemonicState={this.updateMnemonicState}
-                />
-                <MnemonicWord
-                  value={this.state.mnemonic[15]}
-                  position={15}
-                  updateMnemonicState={this.updateMnemonicState}
-                />
-                <MnemonicWord
-                  value={this.state.mnemonic[16]}
-                  position={16}
-                  updateMnemonicState={this.updateMnemonicState}
-                />
-              </Flex>
-              <Flex sx={{marginBottom: 20}} justifyContent={'space-between'}>
-                <MnemonicWord
-                  value={this.state.mnemonic[17]}
-                  position={17}
-                  updateMnemonicState={this.updateMnemonicState}
-                />
-                <MnemonicWord
-                  value={this.state.mnemonic[18]}
-                  position={18}
-                  updateMnemonicState={this.updateMnemonicState}
-                />
-                <MnemonicWord
-                  value={this.state.mnemonic[19]}
-                  position={19}
-                  updateMnemonicState={this.updateMnemonicState}
-                />
-                <MnemonicWord
-                  value={this.state.mnemonic[20]}
-                  position={20}
-                  updateMnemonicState={this.updateMnemonicState}
-                />
-              </Flex>
-              <Flex sx={{marginBottom: 20}} justifyContent={'space-between'}>
-                <MnemonicWord
-                  value={this.state.mnemonic[21]}
-                  position={21}
-                  updateMnemonicState={this.updateMnemonicState}
-                />
-                <MnemonicWord
-                  value={this.state.mnemonic[22]}
-                  position={22}
-                  updateMnemonicState={this.updateMnemonicState}
-                />
-                <MnemonicWord
-                  value={this.state.mnemonic[23]}
-                  position={23}
-                  updateMnemonicState={this.updateMnemonicState}
-                />
-                <MnemonicWord
-                  value={this.state.mnemonic[24]}
-                  position={24}
-                  updateMnemonicState={this.updateMnemonicState}
-                />
-              </Flex>
-              <Button
-                sx={{cursor: 'pointer'}}
-                variant="primary"
-                onClick={async () => await this.submitmnemonic()}
+              <Flex
+                sx={{
+                  marginBottom: 20,
+                  height: 300,
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  border: '1px solid green',
+                }}
+                justifyContent={'space-between'}
               >
-                Submit
-              </Button>
+                <Label htmlFor="comment">Mnemnonic Phrase</Label>
+                <Textarea
+                  height={200}
+                  onChange={(e) => this.setState({mnemonic: e.target.value})}
+                />
+                <Flex sx={{border: '1px solid red', width: 300}} justifyContent={'space-between'}>
+                  <Button
+                    sx={{cursor: 'pointer'}}
+                    variant="primary"
+                    onClick={async () => await this.submitCredentials()}
+                  >
+                    Submit
+                  </Button>
+
+                  <Button
+                    sx={{cursor: 'pointer'}}
+                    variant="primary"
+                    onClick={async () => await this.submitCredentials()}
+                  >
+                    Close
+                  </Button>
+                </Flex>
+              </Flex>
             </Flex>
           </Flex>
         </Flex>

@@ -8,6 +8,7 @@ import LoginView from './views/LoginView';
 import DocumentsView from './views/DocumentsView';
 import FocusDocumentView from './views/FocusDocumentView';
 import FocusAccessRequestView from './views/FocusAccessRequestView';
+import PermissionsView from './views/PermissionsView';
 import SettingsView from './views/SettingsView';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import {NavigationContainer} from '@react-navigation/native';
@@ -33,6 +34,7 @@ const StackNavigator = () => {
         <Stack.Screen name="Settings" component={SettingsView} />
         <Stack.Screen name="FocusedDocument" component={FocusDocumentView} />
         <Stack.Screen name="FocusAccessRequest" component={FocusAccessRequestView} />
+        <Stack.Screen name="Permissions" component={PermissionsView} />
         <Stack.Screen name="Tabs" component={TabNavigator} />
       </Stack.Navigator>
     </NavigationContainer>

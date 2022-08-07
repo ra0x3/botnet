@@ -49,6 +49,7 @@ const SettingItem = ({
     }
 
     updateSettingItem(data);
+    updateSettingActionState(ActionState.success);
   };
 
   return (

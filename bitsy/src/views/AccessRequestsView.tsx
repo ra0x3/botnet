@@ -4,6 +4,7 @@ import {List} from 'react-native-paper';
 import {color} from '../const';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import AccessRequest, {AccessRequestStatus} from './../models/AccessRequest';
+import SearchBar from './../components/SearchBar';
 import {generateFakeItems} from '../utils';
 import {NavigationProps} from '../global';
 import ThirdParty from '../models/ThirdParty';
@@ -66,6 +67,7 @@ class AccessRequestsViewItem extends React.Component<
 
 interface AccessRequestsViewState {
   items: Array<AccessRequest>;
+  query: string;
 }
 
 interface AccessRequestsViewProps extends NavigationProps {}
@@ -74,18 +76,20 @@ class AccessRequestsView extends React.Component<AccessRequestsViewProps, Access
   constructor(props: AccessRequestsViewProps) {
     super(props);
     this.state = {
+      query: '',
       items: generateFakeItems(
         new AccessRequest(
           '123456',
           new ThirdParty('5432', 'Taboola'),
-          new Account('', '0x001', 123, '', null),
+          new Account('', '0x001', 'password', 123, '', null),
           AccessRequestStatus.Pending,
           new Document(
             '0x0123',
             'Chase Saphire 1',
             new DocumentBlob('<xml>credit card info</xml>'),
-            new Account('', '0x001', 123, '', null),
+            new Account('', '0x001', 'password', 123, '', null),
             '0x0000',
+            123,
           ),
           'https://duckduckgo.com',
           {q: 'duckduckgo search'},
@@ -107,6 +111,24 @@ class AccessRequestsView extends React.Component<AccessRequestsViewProps, Access
     return <AccessRequestsViewItem navigate={this.navigate} item={item} key={String(item.uuid)} />;
   };
 
+  onSearchChange = (query: string) => {
+    this.setState({query});
+  };
+
+  filteredResults() {
+    if (this.state.query === '') {
+      return this.state.items;
+    } else {
+      const query = this.state.query.toLowerCase();
+      return this.state.items.filter((item: AccessRequest, i: number) => {
+        return (
+          item.third_party.name.toLowerCase().startsWith(query) ||
+          item.document.name.includes(query)
+        );
+      });
+    }
+  }
+
   render = () => {
     return (
       <SafeAreaView>
@@ -118,7 +140,9 @@ class AccessRequestsView extends React.Component<AccessRequestsViewProps, Access
             flexDirection: 'column',
           }}
         >
-          <View style={{borderWidth: 1, borderColor: 'red', height: 100, width: '100%'}}></View>
+          <View style={{borderWidth: 1, borderColor: 'red', height: 100, width: '100%'}}>
+            <SearchBar onChangeText={this.onSearchChange} query={this.state.query} />
+          </View>
           <View
             style={{
               display: 'flex',
@@ -128,7 +152,7 @@ class AccessRequestsView extends React.Component<AccessRequestsViewProps, Access
             }}
           >
             <FlatList
-              data={this.state.items}
+              data={this.filteredResults()}
               renderItem={this.renderItem}
               keyExtractor={(item) => item.uuid}
             />

@@ -85,9 +85,18 @@ def create_access_token_for_third_party_id(
 
 
 @use_case
-def create_third_party_account(pubkey: PublicKey) -> ThirdPartyAccount:
+def create_third_party_account(
+    password_hash: str,
+    pubkey: Optional[PublicKey] = None,
+    address: Optional[str] = None,
+) -> ThirdPartyAccount:
     party = create_third_party()
-    account = create_account(pubkey, for_third_party=True)
+    account = create_account(
+        pubkey=pubkey,
+        address=address,
+        password_hash=password_hash,
+        for_third_party=True,
+    )
     third_party_account = ThirdPartyAccount(party, account)
     third_party_account.save()
     return third_party_account
@@ -170,18 +179,36 @@ def create_access_token_for_third_party(
 
 
 @use_case
-def create_account(pubkey: PublicKey, for_third_party: bool = False) -> Account:
-    account = Account(
-        key_image(pubkey.to_hex()),
-        pubkey.to_checksum_address(),
-    )
+def create_account(
+    password_hash: str,
+    pubkey: Optional[PublicKey] = None,
+    address: Optional[str] = None,
+    for_third_party: bool = False,
+) -> Account:
+    account: Account
+    if pubkey:
+        account = Account(
+            password_hash=password_hash,
+            pubkey=key_image(pubkey.to_hex()),
+            address=pubkey.to_checksum_address(),
+        )
+    elif address:
+        account = Account(address=address, password_hash=password_hash)
+    else:
+        raise Exception(
+            "Invalid input to create_account. pubkey and address both empty"
+        )
+
     account.save()
     if not for_third_party:
         account.create_account_settings()
     else:
         account.create_party_settings()
     account.set_jwt(derive_jwt({"address": account.address}))
-    _ = keystore.put_key(pubkey)
+
+    if pubkey:
+        _ = keystore.put_key(pubkey)
+
     return account
 
 

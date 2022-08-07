@@ -1,5 +1,5 @@
 export default class Account {
-  pubkey: string;
+  pubkey: Option<string>;
   address: string;
   created_at: number;
   jwt: string;

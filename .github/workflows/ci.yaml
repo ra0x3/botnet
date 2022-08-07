@@ -124,9 +124,7 @@ jobs:
     runs-on: macOS-latest
     steps:
       - uses: actions/checkout@v2
-      - run: fastlane beta
-        env:
-          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+      
 
   publish-docker-images:
     runs-on: ubuntu-latest

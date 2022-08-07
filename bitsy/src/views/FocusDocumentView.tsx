@@ -1,5 +1,6 @@
 import React from 'react';
 import {View, SafeAreaView, StatusBar, Text} from 'react-native';
+import {color} from '../const';
 
 interface FocusDocumentViewState {}
 
@@ -38,7 +39,18 @@ class FocusDocumentView extends React.Component<FocusDocumentViewProps, FocusDoc
                   justifyContent: 'center',
                 }}
               >
-                <Text>Document</Text>
+                <View
+                  style={{
+                    borderWidth: 1,
+                    width: '90%',
+                    height: '90%',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text>Image</Text>
+                </View>
               </View>
 
               <View
@@ -53,15 +65,67 @@ class FocusDocumentView extends React.Component<FocusDocumentViewProps, FocusDoc
                 }}
               >
                 <View style={{borderWidth: 1, borderColor: 'green', width: '50%', height: 200}}>
-                  <View style={{borderWidth: 1, height: 100, width: '100%'}}>
-                    <Text>A</Text>
+                  <View
+                    style={{
+                      borderWidth: 1,
+                      height: 100,
+                      width: '100%',
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <View
+                      style={{
+                        borderWidth: 1,
+                        width: '90%',
+                        height: '85%',
+                        backgroundColor: color.white,
+                        borderRadius: 10,
+                      }}
+                    ></View>
                   </View>
-                  <View style={{borderWidth: 1, height: 100, width: '100%'}}>
-                    <Text>B</Text>
+                  <View
+                    style={{
+                      borderWidth: 1,
+                      height: 100,
+                      width: '100%',
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <View
+                      style={{
+                        borderWidth: 1,
+                        width: '90%',
+                        height: '85%',
+                        backgroundColor: color.white,
+                        borderRadius: 10,
+                      }}
+                    ></View>
                   </View>
                 </View>
-                <View style={{borderWidth: 1, borderColor: 'red', width: '50%', height: 200}}>
-                  <Text>C</Text>
+                <View
+                  style={{
+                    borderWidth: 1,
+                    borderColor: 'red',
+                    width: '50%',
+                    height: 200,
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}
+                >
+                  <View
+                    style={{
+                      borderWidth: 1,
+                      width: '90%',
+                      height: '100%',
+                      backgroundColor: color.white,
+                      borderRadius: 10,
+                    }}
+                  ></View>
                 </View>
               </View>
               <View
@@ -76,7 +140,15 @@ class FocusDocumentView extends React.Component<FocusDocumentViewProps, FocusDoc
                   justifyContent: 'center',
                 }}
               >
-                <Text>Document</Text>
+                <View
+                  style={{
+                    borderWidth: 1,
+                    width: '95%',
+                    height: '90%',
+                    backgroundColor: color.white,
+                    borderRadius: 10,
+                  }}
+                ></View>
               </View>
             </View>
           </View>

@@ -137,7 +137,7 @@ class AccessTokensView extends React.Component<AccessTokensViewProps, AccessToke
   }
 
   async componentDidMount() {
-    this.setState({ accessTokenActionState: ActionState.pending });
+    this.setState({accessTokenActionState: ActionState.pending});
     const {data, error} = await httpRequest({
       url: '/access-token',
       method: 'GET',

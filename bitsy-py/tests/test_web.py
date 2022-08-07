@@ -37,18 +37,24 @@ class TestWeb(BaseTestClass):
             json={
                 "pubkey": RealMetamaskAcct.compressed_pubkey,
                 "address": RealMetamaskAcct.address0,
+                "password_hash": blake3_("mypassword"),
             },
         )
         rjson = response.json()
 
         recovered_pubkey = recover_pubkey_from_compressed_hex(RealMetamaskAcct.compressed_pubkey)
 
-        account = Account.from_row((rjson["pubkey"], rjson["address"], rjson["created_at"], None))
+        account = Account.from_row(
+            (rjson["address"], rjson["password_hash"], rjson["pubkey"], rjson["created_at"], None)
+        )
         assert response.status_code == status.HTTP_200_OK
         assert account.pubkey == blake3_(recovered_pubkey.to_hex())
+        assert account.address == rjson["address"]
+        assert account.password_hash == blake3_("mypassword")
+        assert isinstance(account.created_at, int)
 
-    def test_route_create_document(self, keypair):
-        account = create_account(keypair.pubkey)
+    def test_route_create_document(self, test_account):
+        account = test_account
         response = self.client.post(
             "/document",
             json={"name": "My doc", "data": "Attack at dawn!"},
@@ -64,6 +70,7 @@ class TestWeb(BaseTestClass):
                 rjson["blob"]["data"],
                 rjson["account"]["address"],
                 rjson["key_img"],
+                rjson["created_at"],
             )
         )
 
@@ -75,8 +82,8 @@ class TestWeb(BaseTestClass):
         assert document.name == "My doc"
         assert key.decrypt(encode(document.blob.data, Encoding.UTF8)) == b"Attack at dawn!"
 
-    def test_route_new_access_token_for_third_party(self, keypair):
-        item = create_third_party_account(keypair.pubkey)
+    def test_route_new_access_token_for_third_party(self, test_party_account):
+        item = test_party_account
 
         response = self.client.post(
             "/access-token",
@@ -99,8 +106,8 @@ class TestWeb(BaseTestClass):
         assert not token.active
         assert token.name == "foobar"
 
-    def test_route_grant_perms_on_doc_for_third_party(self, keypair, xml_doc):
-        account = create_account(keypair.pubkey)
+    def test_route_grant_perms_on_doc_for_third_party(self, test_account, xml_doc):
+        account = test_account
         party = create_third_party()
         _ = new_access_token_for_third_party(party)
         document = create_document_for_account("doc", xml_doc, account)
@@ -125,6 +132,7 @@ class TestWeb(BaseTestClass):
                 rjson["account"]["address"],
                 rjson["third_party"]["uuid"],
                 rjson["ttl"],
+                rjson["created_at"],
             )
         )
 
@@ -132,8 +140,8 @@ class TestWeb(BaseTestClass):
         assert permission.account.pubkey == account.pubkey
         assert permission.account.address == account.address
 
-    def test_route_get_stats_for_account_id(self, keypair, xml_doc):
-        account = create_account(keypair.pubkey)
+    def test_route_get_stats_for_account_id(self, test_account, xml_doc):
+        account = test_account
         party = create_third_party()
         _ = new_access_token_for_third_party(party)
         document = create_document_for_account("doc", xml_doc, account)
@@ -148,8 +156,8 @@ class TestWeb(BaseTestClass):
 
         assert all(conditions)
 
-    def test_route_add_setting_to_account_id(self, keypair):
-        account = create_account(keypair.pubkey)
+    def test_route_add_setting_to_account_id(self, test_account):
+        account = test_account
         response = self.client.post(
             "/setting",
             json={
@@ -171,8 +179,8 @@ class TestWeb(BaseTestClass):
         assert setting.key == SettingKey.Other
         assert setting.enabled()
 
-    def test_route_toggle_account_setting_id(self, keypair):
-        account = create_account(keypair.pubkey)
+    def test_route_toggle_account_setting_id(self, test_account):
+        account = test_account
         setting = add_setting_to_account(account, SettingKey.Other, 1)
         assert setting.enabled()
         response = self.client.put(
@@ -195,8 +203,8 @@ class TestWeb(BaseTestClass):
         assert setting.key == SettingKey.Other
         assert setting.disabled()
 
-    def test_route_toggle_third_party_token(self, keypair):
-        party_acct = create_third_party_account(keypair.pubkey)
+    def test_route_toggle_third_party_token(self, test_party_account):
+        party_acct = test_party_account
         token = create_access_token_for_third_party(party_acct.party, "bar")
         assert not token.active
 
@@ -221,8 +229,8 @@ class TestWeb(BaseTestClass):
 
         assert token.active
 
-    def test_route_revoke_perms_on_existing_doc_for_third_party_id(self, keypair, xml_doc):
-        account = create_account(keypair.pubkey)
+    def test_route_revoke_perms_on_existing_doc_for_third_party_id(self, test_account, xml_doc):
+        account = test_account
         party = create_third_party()
         document = create_document_for_account("another doc", xml_doc, account)
         perm = grant_perms_on_existing_doc_for_third_party(
@@ -242,8 +250,8 @@ class TestWeb(BaseTestClass):
         perm = self.get_from_db(f"SELECT * FROM permissions WHERE uuid = '{perm.uuid}';")
         assert not perm
 
-    def test_route_create_third_party_webhook_id(self, keypair):
-        item = create_third_party_account(keypair.pubkey)
+    def test_route_create_third_party_webhook_id(self, test_party_account):
+        item = test_party_account
         response = self.client.post(
             "/webhook",
             json={
@@ -259,8 +267,8 @@ class TestWeb(BaseTestClass):
         assert "third_party" in rjson
         assert not rjson["active"]
 
-    def test_route_delete_third_party_webhook_id(self, keypair):
-        party_acct = create_third_party_account(keypair.pubkey)
+    def test_route_delete_third_party_webhook_id(self, test_party_account):
+        party_acct = test_party_account
         webhook = create_third_party_webhook(
             party_acct.party, "/foo", WebhookType.Incoming, "foo", 0
         )
@@ -277,13 +285,13 @@ class TestWeb(BaseTestClass):
         result = self.get_from_db(f"SELECT * FROM webhooks WHERE uuid = '{webhook.uuid}'")
         assert not result
 
-    def test_route_create_third_party_access_request_id(self, xml_doc):
+    def test_route_create_third_party_access_request_id(
+        self, xml_doc, test_account, test_party_account
+    ):
         from .conftest import keypair_func
 
-        keypair1 = keypair_func()
-        keypair2 = keypair_func()
-        party_acct = create_third_party_account(keypair1.pubkey)
-        account = create_account(keypair2.pubkey)
+        party_acct = test_party_account
+        account = test_account
         document = create_document_for_account("something", xml_doc, account)
 
         response = self.client.post(

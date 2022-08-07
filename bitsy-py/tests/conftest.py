@@ -15,6 +15,7 @@ from bitsy._const import web3
 from bitsy._models import Model
 from bitsy._crypto import Keypair
 from bitsy._config import config
+from bitsy._uses import create_account, create_third_party_account
 
 from .utils import *
 
@@ -44,14 +45,27 @@ def xml_doc() -> str:
 </Document>"""
 
 
-@pytest.fixture
-def pubkey(n: int = 36) -> str:
+def rand_string(n: int = 36) -> str:
     return "".join([random.choice(chars) for _ in range(n)])
 
 
 @pytest.fixture
 def eth_acct() -> eth_account.Account:
     return web3.eth.account.create()
+
+
+@pytest.fixture
+def test_account() -> Model.Account:
+    keypair = keypair_func()
+    password_hash = blake3_(rand_string())
+    return create_account(pubkey=keypair.pubkey, password_hash=password_hash)
+
+
+@pytest.fixture
+def test_party_account() -> Model.Account:
+    keypair = keypair_func()
+    password_hash = blake3_(rand_string())
+    return create_third_party_account(pubkey=keypair.pubkey, password_hash=password_hash)
 
 
 @pytest.fixture
