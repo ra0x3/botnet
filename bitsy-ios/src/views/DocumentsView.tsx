@@ -153,45 +153,48 @@ class DocumentsView extends React.Component<DocumentsViewProps, DocumentsViewSta
 
   render = () => {
     return (
-      <SafeAreaView>
-        <StatusBar />
-        <View
-          style={{
-            height: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-          }}
-        >
-          <View style={{borderWidth: 1, borderColor: 'red', height: 100, width: '100%'}}>
-            <Appbar.Header>
-              <Appbar.Content title="Documents" subtitle={'Manage your documents'} />
-              <Appbar.Action
-                style={{borderWidth: 1, height: 50, width: 50}}
-                icon={() => (
-                  <Ionicons name="ios-add-circle-outline" size={25} color={color.white} />
-                )}
-                onPress={() => {}}
-              />
-            </Appbar.Header>
-            <SearchBar onChangeText={this.onSearchChange} query={this.state.query} />
-          </View>
+      <React.Fragment>
+        <SafeAreaView style={{flex: 0, backgroundColor: color.cobalt}} />
+        <SafeAreaView>
+          <StatusBar />
           <View
             style={{
+              height: '100%',
               display: 'flex',
-              width: '100%',
-              borderWidth: 1,
-              borderColor: 'blue',
-              marginTop: 20,
+              flexDirection: 'column',
             }}
           >
-            <FlatList
-              data={this.filteredResults()}
-              renderItem={this.renderItem}
-              keyExtractor={(item) => item.cid}
-            />
+            <View style={{borderWidth: 1, borderColor: 'red', height: 100, width: '100%'}}>
+              <Appbar.Header>
+                <Appbar.Content title="Documents" subtitle={'Manage your documents'} />
+                <Appbar.Action
+                  style={{borderWidth: 1, height: 50, width: 50}}
+                  icon={() => (
+                    <Ionicons name="ios-add-circle-outline" size={25} color={color.white} />
+                  )}
+                  onPress={() => {}}
+                />
+              </Appbar.Header>
+              <SearchBar onChangeText={this.onSearchChange} query={this.state.query} />
+            </View>
+            <View
+              style={{
+                display: 'flex',
+                width: '100%',
+                borderWidth: 1,
+                borderColor: 'blue',
+                marginTop: 20,
+              }}
+            >
+              <FlatList
+                data={this.filteredResults()}
+                renderItem={this.renderItem}
+                keyExtractor={(item) => item.cid}
+              />
+            </View>
           </View>
-        </View>
-      </SafeAreaView>
+        </SafeAreaView>
+      </React.Fragment>
     );
   };
 }

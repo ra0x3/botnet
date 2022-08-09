@@ -27,6 +27,9 @@ const StackNavigator = () => {
         initialRouteName={'Login'}
         screenOptions={{
           headerShown: false,
+          headerStyle: {
+            backgroundColor: 'red',
+          },
         }}
       >
         <Stack.Screen name="Login" component={LoginView} />

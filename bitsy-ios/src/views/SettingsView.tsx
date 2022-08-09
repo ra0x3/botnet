@@ -54,7 +54,6 @@ class SettingsViewItem extends React.Component<SettingsViewItemProps, SettingsVi
             </View>
           );
         }}
-        onPress={() => navigate('FocusAccessRequest')}
       />
     );
   };
