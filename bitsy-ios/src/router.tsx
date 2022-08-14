@@ -27,6 +27,9 @@ const StackNavigator = () => {
         initialRouteName={'Login'}
         screenOptions={{
           headerShown: false,
+          headerStyle: {
+            backgroundColor: 'red',
+          },
         }}
       >
         <Stack.Screen name="Login" component={LoginView} />
@@ -44,7 +47,7 @@ const StackNavigator = () => {
 const TabNavigator = () => {
   return (
     <Tab.Navigator
-      initialRouteName={'Feed'}
+      initialRouteName={'Account'}
       screenOptions={({route}) => ({
         tabBarIcon: ({focused, color: dcolor, size}) => {
           let iconname: string = '';
@@ -76,7 +79,7 @@ const TabNavigator = () => {
         headerShown: false,
       })}
     >
-      <Tab.Screen name="Feed" component={FeedView} />
+      {/* <Tab.Screen name="Feed" component={FeedView} /> */}
       <Tab.Screen name="AccessRequests" component={AccessRequestsView} />
       <Tab.Screen name="Documents" component={DocumentsView} />
       <Tab.Screen name="Account" component={AccountView} />

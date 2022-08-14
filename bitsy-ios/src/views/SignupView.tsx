@@ -96,6 +96,7 @@ class SignupView extends React.Component<SignupViewProps, SignupViewState> {
               <TextInput
                 label="New Password"
                 mode="outlined"
+                // secureTextEntry={true}
                 value={this.state.password}
                 onChangeText={(text) => this.setState({password: text})}
                 style={{width: '100%', height: 40}}

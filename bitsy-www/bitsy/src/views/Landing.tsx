@@ -136,6 +136,7 @@ class LandingView extends React.Component<LandingViewProps, LandingViewState> {
                 }}
                 justifyContent={'space-between'}
               >
+                {/* TODO: Add password for mnemonic? */}
                 <Label htmlFor="comment">Mnemnonic Phrase</Label>
                 <Textarea
                   height={200}

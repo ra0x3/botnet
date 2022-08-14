@@ -1,6 +1,12 @@
 import DocumentBlob from './DocumentBlob';
 import Account from './Account';
 
+export enum DocumentType {
+  Basic = 'Basic',
+  BankCard = 'BankCard',
+  BankAccount = 'BankAccount',
+}
+
 export default class Document {
   cid: string;
   name: string;

@@ -1,6 +1,6 @@
 import React from 'react';
 import {View, SafeAreaView, StatusBar, FlatList, Text} from 'react-native';
-import {List} from 'react-native-paper';
+import {List, Appbar} from 'react-native-paper';
 import {color} from '../const';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import AccessRequest, {AccessRequestStatus} from './../models/AccessRequest';
@@ -131,34 +131,40 @@ class AccessRequestsView extends React.Component<AccessRequestsViewProps, Access
 
   render = () => {
     return (
-      <SafeAreaView>
-        <StatusBar />
-        <View
-          style={{
-            height: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-          }}
-        >
-          <View style={{borderWidth: 1, borderColor: 'red', height: 100, width: '100%'}}>
-            <SearchBar onChangeText={this.onSearchChange} query={this.state.query} />
-          </View>
+      <React.Fragment>
+        <SafeAreaView style={{flex: 0, backgroundColor: color.cobalt}} />
+        <SafeAreaView>
+          <StatusBar />
           <View
             style={{
+              height: '100%',
               display: 'flex',
-              width: '100%',
-              borderWidth: 1,
-              borderColor: 'blue',
+              flexDirection: 'column',
             }}
           >
-            <FlatList
-              data={this.filteredResults()}
-              renderItem={this.renderItem}
-              keyExtractor={(item) => item.uuid}
-            />
+            <View style={{borderWidth: 1, borderColor: 'red', height: 100, width: '100%'}}>
+              <Appbar.Header>
+                <Appbar.Content title="Access Requests" subtitle={'Manage your access requests'} />
+              </Appbar.Header>
+              <SearchBar onChangeText={this.onSearchChange} query={this.state.query} />
+            </View>
+            <View
+              style={{
+                display: 'flex',
+                width: '100%',
+                borderWidth: 1,
+                borderColor: 'blue',
+              }}
+            >
+              <FlatList
+                data={this.filteredResults()}
+                renderItem={this.renderItem}
+                keyExtractor={(item) => item.uuid}
+              />
+            </View>
           </View>
-        </View>
-      </SafeAreaView>
+        </SafeAreaView>
+      </React.Fragment>
     );
   };
 }

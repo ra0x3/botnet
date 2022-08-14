@@ -124,34 +124,37 @@ class FeedView extends React.Component<FeedViewProps, FeedViewState> {
 
   render = () => {
     return (
-      <SafeAreaView>
-        <StatusBar />
-        <View
-          style={{
-            height: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-          }}
-        >
-          <View style={{borderWidth: 1, borderColor: 'red', height: 100, width: '100%'}}>
-            <SearchBar onChangeText={this.onSearchChange} query={this.state.query} />
-          </View>
+      <React.Fragment>
+        <SafeAreaView style={{flex: 0, backgroundColor: color.cobalt}} />
+        <SafeAreaView>
+          <StatusBar />
           <View
             style={{
+              height: '100%',
               display: 'flex',
-              width: '100%',
-              borderWidth: 1,
-              borderColor: 'blue',
+              flexDirection: 'column',
             }}
           >
-            <FlatList
-              data={this.filteredResults()}
-              renderItem={this.renderItem}
-              keyExtractor={(item) => item.id()}
-            />
+            <View style={{borderWidth: 1, borderColor: 'red', height: 100, width: '100%'}}>
+              <SearchBar onChangeText={this.onSearchChange} query={this.state.query} />
+            </View>
+            <View
+              style={{
+                display: 'flex',
+                width: '100%',
+                borderWidth: 1,
+                borderColor: 'blue',
+              }}
+            >
+              <FlatList
+                data={this.filteredResults()}
+                renderItem={this.renderItem}
+                keyExtractor={(item) => item.id()}
+              />
+            </View>
           </View>
-        </View>
-      </SafeAreaView>
+        </SafeAreaView>
+      </React.Fragment>
     );
   };
 }
