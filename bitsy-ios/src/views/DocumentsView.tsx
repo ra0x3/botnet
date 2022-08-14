@@ -1,13 +1,23 @@
 import React from 'react';
 import {View, SafeAreaView, StatusBar, FlatList, Text, TouchableOpacity} from 'react-native';
-import {Button, Portal, Dialog, Paragraph, Appbar} from 'react-native-paper';
+import {
+  Button,
+  Portal,
+  Dialog,
+  Paragraph,
+  Appbar,
+  AnimatedFAB,
+  Menu,
+  Divider,
+} from 'react-native-paper';
+import Dropdown from 'react-native-paper-dropdown';
 import {color} from '../const';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import SearchBar from '../components/SearchBar';
 import {generateFakeItems} from '../utils';
-import {NavigationProps} from '../global';
+import {NavigationProps, Option} from '../global';
 import Account from '../models/Account';
-import Document from '../models/Document';
+import Document, {DocumentType} from '../models/Document';
 import DocumentBlob from '../models/DocumentBlob';
 
 interface DocumentsViewItemProps {
@@ -60,7 +70,7 @@ class DocumentsViewItem extends React.Component<DocumentsViewItemProps, Document
           style={{
             borderWidth: 1,
             borderColor: color.light_grey,
-            width: '100%',
+            width: 350,
             height: 100,
           }}
         >
@@ -100,9 +110,41 @@ class DocumentsViewItem extends React.Component<DocumentsViewItemProps, Document
   };
 }
 
+interface BankCardForm {
+  type: DocumentType;
+  firstName: string;
+  lastName: string;
+  address: string;
+  number: string;
+  ccv: string;
+  expiry: string; // MM-YYYY
+  zipCode: string;
+}
+
+interface BankAccountForm {
+  type: DocumentType;
+  firstName: string;
+  lastName: string;
+  accountNumber: string;
+  routingNumber: string;
+}
+
+interface BasicForm {
+  type: DocumentType;
+  text: string;
+}
+
+type DocumentForm = BankCardForm | BankAccountForm | BasicForm;
+
 interface DocumentsViewState {
   items: Array<Document>;
   query: string;
+  extendedAddButton: boolean;
+  renderAddDocumentMenu: boolean;
+  showrenderAddDocumentMenuDropdown: boolean;
+  showrenderAddDocumentMenuDropdownValue: DocumentType;
+  showrenderAddDocumentMenuForm: Option<DocumentType>;
+  form: Option<DocumentForm>;
 }
 
 interface DocumentsViewProps extends NavigationProps {}
@@ -112,6 +154,12 @@ class DocumentsView extends React.Component<DocumentsViewProps, DocumentsViewSta
     super(props);
     this.state = {
       query: '',
+      extendedAddButton: false,
+      renderAddDocumentMenu: false,
+      showrenderAddDocumentMenuDropdown: false,
+      showrenderAddDocumentMenuDropdownValue: DocumentType.Basic,
+      form: null,
+      showrenderAddDocumentMenuForm: null,
       items: generateFakeItems(
         new Document(
           '0x123',
@@ -140,7 +188,7 @@ class DocumentsView extends React.Component<DocumentsViewProps, DocumentsViewSta
     this.setState({query});
   };
 
-  filteredResults() {
+  filteredResults = () => {
     if (this.state.query === '') {
       return this.state.items;
     } else {
@@ -149,7 +197,168 @@ class DocumentsView extends React.Component<DocumentsViewProps, DocumentsViewSta
         return item.name.toLowerCase().startsWith(query);
       });
     }
-  }
+  };
+
+  renderAddDocumentMenuFormInnerContent = () => {
+    switch (this.state.showrenderAddDocumentMenuForm) {
+      case DocumentType.BankAccount:
+        return (
+          <View
+            style={{
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+          >
+            <Text>Bank Account</Text>
+          </View>
+        );
+      case DocumentType.BankCard:
+        return (
+          <View
+            style={{
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+          >
+            <Text>Bank Card</Text>
+          </View>
+        );
+      case DocumentType.Basic:
+        return (
+          <View
+            style={{
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+          >
+            <Text>Basic</Text>
+          </View>
+        );
+    }
+  };
+
+  renderAddDocumentMenuForm = () => {
+    if (this.state.showrenderAddDocumentMenuForm) {
+      return (
+        <View
+          style={{
+            borderWidth: 1,
+            borderColor: 'green',
+            width: '100%',
+            height: 250,
+          }}
+        >
+          {this.renderAddDocumentMenuFormInnerContent()}
+        </View>
+      );
+    }
+  };
+
+  renderAddDocumentMenu = () => {
+    if (this.state.renderAddDocumentMenu) {
+      return (
+        <View
+          style={{
+            borderWidth: 1,
+            backgroundColor: color.white,
+            width: 300,
+            height: 400,
+            position: 'absolute',
+            zIndex: 10,
+            padding: 10,
+          }}
+        >
+          <Dropdown
+            label="Document Type"
+            mode="outlined"
+            value={this.state.showrenderAddDocumentMenuDropdownValue}
+            setValue={(text) => {
+              this.setState({showrenderAddDocumentMenuDropdownValue: text}, () => {
+                switch (this.state.showrenderAddDocumentMenuDropdownValue) {
+                  case DocumentType.BankCard:
+                    this.setState({
+                      form: {
+                        type: DocumentType.BankCard,
+                        firstName: '',
+                        lastName: '',
+                        address: '',
+                        number: '',
+                        ccv: '',
+                        expiry: '',
+                        zipCode: '',
+                      },
+                      showrenderAddDocumentMenuForm: DocumentType.BankCard,
+                    });
+                    break;
+                  case DocumentType.BankAccount:
+                    this.setState({
+                      form: {
+                        type: DocumentType.BankAccount,
+                        firstName: '',
+                        lastName: '',
+                        accountNumber: '',
+                        routingNumber: '',
+                      },
+                      showrenderAddDocumentMenuForm: DocumentType.BankAccount,
+                    });
+                    break;
+                  case DocumentType.Basic:
+                    this.setState({
+                      form: {
+                        type: DocumentType.Basic,
+                        text: '',
+                      },
+                      showrenderAddDocumentMenuForm: DocumentType.Basic,
+                    });
+                    break;
+                }
+              });
+            }}
+            list={[
+              {
+                value: DocumentType.Basic,
+                label: DocumentType.Basic,
+              },
+              {
+                value: DocumentType.BankCard,
+                label: DocumentType.BankCard,
+              },
+              {
+                value: DocumentType.BankAccount,
+                label: DocumentType.BankAccount,
+              },
+            ]}
+            inputProps={{right: <Ionicons name={'ios-add-outline'} size={20} />}}
+            visible={this.state.showrenderAddDocumentMenuDropdown}
+            showDropDown={() => this.setState({showrenderAddDocumentMenuDropdown: true})}
+            onDismiss={() => this.setState({showrenderAddDocumentMenuDropdown: false})}
+            dropDownStyle={{
+              width: '100%',
+            }}
+          />
+          {this.renderAddDocumentMenuForm()}
+          <Button
+            onPress={() =>
+              this.setState({
+                renderAddDocumentMenu: false,
+                showrenderAddDocumentMenuDropdown: false,
+              })
+            }
+          >
+            Close
+          </Button>
+        </View>
+      );
+    }
+  };
+
+  onScroll = ({nativeEvent}: any) => {
+    const currentScrollPosition = Math.floor(nativeEvent?.contentOffset?.y) ?? 0;
+    this.setState({extendedAddButton: currentScrollPosition <= 0});
+  };
 
   render = () => {
     return (
@@ -160,6 +369,7 @@ class DocumentsView extends React.Component<DocumentsViewProps, DocumentsViewSta
           <View
             style={{
               height: '100%',
+              width: '100%',
               display: 'flex',
               flexDirection: 'column',
             }}
@@ -172,7 +382,7 @@ class DocumentsView extends React.Component<DocumentsViewProps, DocumentsViewSta
                   icon={() => (
                     <Ionicons name="ios-add-circle-outline" size={25} color={color.white} />
                   )}
-                  onPress={() => {}}
+                  onPress={() => this.setState({renderAddDocumentMenu: true})}
                 />
               </Appbar.Header>
               <SearchBar onChangeText={this.onSearchChange} query={this.state.query} />
@@ -184,10 +394,14 @@ class DocumentsView extends React.Component<DocumentsViewProps, DocumentsViewSta
                 borderWidth: 1,
                 borderColor: 'blue',
                 marginTop: 20,
+                position: 'relative',
+                alignItems: 'center',
               }}
             >
+              {this.renderAddDocumentMenu()}
               <FlatList
                 data={this.filteredResults()}
+                onScroll={this.onScroll}
                 renderItem={this.renderItem}
                 keyExtractor={(item) => item.cid}
               />

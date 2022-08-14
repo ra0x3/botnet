@@ -120,7 +120,7 @@ jobs:
           yarn install --frozen-lockfile
           CI=false yarn build
 
-  bitsy:
+  bitsy-ios:
     runs-on: macOS-latest
     steps:
       - uses: actions/checkout@v2
@@ -137,7 +137,7 @@ jobs:
       matrix:
         job:
           - os: ubuntu-latest
-            tag: ralston3/baitsy:rs-latest
+            tag: ralston3/bitsy:rs-latest
             dockerfile: sysadmin/docker/Dockerfile.bitsy.rs
             context: ./bitsy-rs
           - os: ubuntu-latest

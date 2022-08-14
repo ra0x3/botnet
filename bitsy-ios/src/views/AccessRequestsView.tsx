@@ -1,6 +1,6 @@
 import React from 'react';
 import {View, SafeAreaView, StatusBar, FlatList, Text} from 'react-native';
-import {List} from 'react-native-paper';
+import {List, Appbar} from 'react-native-paper';
 import {color} from '../const';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import AccessRequest, {AccessRequestStatus} from './../models/AccessRequest';
@@ -143,6 +143,9 @@ class AccessRequestsView extends React.Component<AccessRequestsViewProps, Access
             }}
           >
             <View style={{borderWidth: 1, borderColor: 'red', height: 100, width: '100%'}}>
+              <Appbar.Header>
+                <Appbar.Content title="Access Requests" subtitle={'Manage your access requests'} />
+              </Appbar.Header>
               <SearchBar onChangeText={this.onSearchChange} query={this.state.query} />
             </View>
             <View

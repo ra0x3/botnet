@@ -179,11 +179,11 @@ class AccountView extends React.Component<AccountViewProps, AccountViewState> {
                   onPress={() => this.props.navigation.navigate('Settings')}
                   style={{height: 50}}
                 />
-                <AccountListItem
+                {/* <AccountListItem
                   title={'Permissions'}
                   onPress={() => this.props.navigation.navigate('Permissions')}
                   style={{height: 50, borderBottomRightRadius: 10, borderBottomLeftRadius: 10}}
-                />
+                /> */}
               </View>
             </ScrollView>
           </View>
