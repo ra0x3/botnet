@@ -31,3 +31,6 @@ export enum ActionState {
   error = 'error',
   none = 'none',
 }
+
+
+export type ErrorMessage = string;

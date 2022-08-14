@@ -84,9 +84,7 @@ class ForeignKey:
 
 
 class Index:
-    def __init__(
-        self, name: str, unique: bool, table_name: str, column_name: "Column"
-    ):
+    def __init__(self, name: str, unique: bool, table_name: str, column_name: "Column"):
         self.name = name
         self.unique = unique
         self.table_name = table_name
@@ -127,10 +125,7 @@ class Column:
 
         if self.foreign_key:
             assert not (
-                self.unique
-                and not self.primary_key
-                and not self.serial
-                and not self.default
+                self.unique and not self.primary_key and not self.serial and not self.default
             ), "Cannot have a FK and other constraints"
 
         if self.unique:
@@ -305,9 +300,7 @@ class BaseModel(ModelEntry):
         result = cursor.fetchone()
 
         if not result and fail_if_not_found:
-            raise ResourceDoesNotExist(
-                "No resource found for clause: {}".format(where)
-            )
+            raise ResourceDoesNotExist("No resource found for clause: {}".format(where))
 
         if not result and return_null:
             return None
@@ -449,9 +442,7 @@ class AccessToken(BaseModel):
 
     def toggle(self):
         self.active = 1 if self.active == 0 else 0
-        AccessToken.update(
-            update={"active": self.active}, where={"uuid": self.uuid}
-        )
+        AccessToken.update(update={"active": self.active}, where={"uuid": self.uuid})
 
 
 class Account(BaseModel):
@@ -758,9 +749,7 @@ class Document(BaseModel):
 
     def update_with_new_blob(self, blob: str) -> FernetBundle:
         bundle = fernet_bundle()
-        ciphertext = decode(
-            bundle.key.encrypt(encode(blob, Encoding.UTF8)), Encoding.UTF8
-        )
+        ciphertext = decode(bundle.key.encrypt(encode(blob, Encoding.UTF8)), Encoding.UTF8)
         self.key_img = bundle.key_img
         self.blob = DocumentBlob(ciphertext)
         return bundle
@@ -891,9 +880,7 @@ class Webhook(BaseModel):
 
     def toggle(self):
         self.active = 0 if self.active == 1 else 1
-        Webhook.update(
-            update={"active": self.active}, where={"uuid": self.uuid}
-        )
+        Webhook.update(update={"active": self.active}, where={"uuid": self.uuid})
 
 
 class AccessRequestStatus(enum.Enum):

@@ -1,11 +1,17 @@
 import React from 'react';
 import {View, SafeAreaView, StatusBar, Text, Image, TouchableOpacity} from 'react-native';
-import {Button, TextInput, Switch} from 'react-native-paper';
-import {NavigationProps} from './../global';
+import {Button, TextInput, Switch, ActivityIndicator} from 'react-native-paper';
+import {httpRequest} from '../utils';
+import {ActionState, ErrorMessage, NavigationProps, Option} from './../global';
+import {color} from '../const';
+import Account from '../models/Account';
+import Session from '../services/Session';
 
 interface LoginViewState {
   password: string;
   unlockWithFaceId: boolean;
+  actionState: ActionState;
+  error: Option<ErrorMessage>;
 }
 
 interface LoginViewProps extends NavigationProps {}
@@ -15,9 +21,56 @@ class LoginView extends React.Component<LoginViewProps, LoginViewState> {
     super(props);
     this.state = {
       password: '',
+      error: null,
       unlockWithFaceId: false,
+      actionState: ActionState.none,
     };
   }
+
+  submitLogin = async () => {
+    this.setState({actionState: ActionState.pending});
+    const {data, error} = await httpRequest({
+      url: '/account/login2',
+      method: 'POST',
+      data: {
+        password: this.state.password,
+      },
+    });
+
+    if (error) {
+      this.setState({actionState: ActionState.error, error});
+      return;
+    }
+
+    this.setState({actionState: ActionState.success}, () => {
+      Session.save(Account.fromObject(data), () => {
+        this.props.navigation.navigate('Tabs', {account: Account.fromObject(data)});
+      });
+    });
+  };
+
+  renderLowerAction = () => {
+    if (this.state.actionState === ActionState.pending) {
+      return <ActivityIndicator animating={true} color={color.black} />;
+    }
+
+    if (this.state.actionState === ActionState.error) {
+    }
+
+    return (
+      <Button
+        mode="outlined"
+        style={{
+          borderRadius: 10,
+          width: '90%',
+          height: 40,
+        }}
+        onPress={async () => await this.submitLogin()}
+      >
+        UNLOCK
+      </Button>
+    );
+  };
 
   render() {
     return (
@@ -89,7 +142,9 @@ class LoginView extends React.Component<LoginViewProps, LoginViewState> {
                 style={{width: '100%', height: 40}}
               />
               <Image
-                source={{uri: 'https://i.imgur.com/lc73Pt5.png'}}
+                source={{
+                  uri: 'https://i.imgur.com/lc73Pt5.png',
+                }}
                 style={{height: 30, width: 30, borderWidth: 1, position: 'absolute', right: 10}}
               />
             </View>
@@ -157,13 +212,7 @@ class LoginView extends React.Component<LoginViewProps, LoginViewState> {
                 alignItems: 'center',
               }}
             >
-              <Button
-                mode="outlined"
-                style={{borderRadius: 10, width: '90%', height: 40}}
-                onPress={() => this.props.navigation.navigate('Tabs')}
-              >
-                UNLOCK
-              </Button>
+              {this.renderLowerAction()}
             </View>
             <View
               style={{

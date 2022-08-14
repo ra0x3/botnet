@@ -1,3 +1,4 @@
+from numbers import Real
 from bitsy._t import *
 from bitsy._uses import *
 from bitsy._utils import *
@@ -41,6 +42,23 @@ class TestUsesCases(BaseTestClass):
             f"SELECT * FROM settings WHERE key = '{SettingKey.BitsyVaultDeletegation.value}' AND account_address = '{account.address}';"
         )
         assert len(result) == 1
+
+    @pytest.mark.skip(reason="Account already exists")
+    def test_can_create_account_using_mnemnonic(self):
+        account = create_account_using_mnemnonic(
+            RealMetamaskAcct.mnemonic, RealMetamaskAcct.password
+        )
+        assert isinstance(account, Account)
+
+        pubkey = mnemonic_to_pubkey(RealMetamaskAcct.mnemonic, RealMetamaskAcct.password)
+        result = self.get_from_db(
+            f"SELECT * FROM accounts WHERE pubkey = '{key_image(pubkey.to_hex())}'"
+        )
+        assert len(result) == 1
+
+        get_account = Account.from_row(result[0])
+        assert account.password_hash == blake3_hexdigest(RealMetamaskAcct.password)
+        assert account.address == pubkey.to_checksum_address()
 
     def test_can_create_get_store_account_with_either_pubkey_or_address(self):
         from .conftest import keypair_func

@@ -1,34 +1,34 @@
 class _BitsyError(Exception):
-    pass
+    code: int
 
 
 class RequestError(Exception):
-    pass
+    code = 500
 
 
 class InvalidPermissionError(_BitsyError):
-    pass
+    code = 500
 
 
 class InvalidSettingError(_BitsyError):
-    pass
+    code = 500
 
 
 class WebError(_BitsyError):
-    pass
+    code = 500
 
 
 class DatabaseError(_BitsyError):
-    pass
+    code = 500
 
 
 class VaultError(_BitsyError):
-    pass
+    code = 500
 
 
 class ResourceDoesNotExist(_BitsyError):
-    pass
+    code = 500
 
 
 class ExpiredAccessTokenError(_BitsyError):
-    pass
+    code = 500

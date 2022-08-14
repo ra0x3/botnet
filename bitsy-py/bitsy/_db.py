@@ -55,9 +55,7 @@ class _Database:
         ]
 
         with self._conn.cursor() as _:
-            self._models_map = dict(
-                [(model.table.name, model) for model in self._models]
-            )
+            self._models_map = dict([(model.table.name, model) for model in self._models])
 
             for table in self._models:
                 table.create()

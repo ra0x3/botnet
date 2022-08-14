@@ -87,17 +87,30 @@ class AccountView extends React.Component<AccountViewProps, AccountViewState> {
                 display: 'flex',
                 borderWidth: 1,
                 borderColor: 'red',
-                padding: 10,
                 width: '100%',
               }}
             >
-              <Text style={{fontWeight: 'bold', fontSize: 32, marginTop: 20}}>Account</Text>
+              <View style={{backgroundColor: color.cobalt, width: '100%', height: 75}}>
+                <Text
+                  style={{
+                    fontWeight: 'bold',
+                    fontSize: 32,
+                    marginTop: 20,
+                    color: color.white,
+                    marginLeft: 20,
+                  }}
+                >
+                  Account
+                </Text>
+              </View>
               <View
                 style={{
                   borderWidth: 1,
                   borderColor: 'blue',
                   display: 'flex',
                   alignItems: 'center',
+                  padding: 10,
+                  marginTop: 20,
                   width: '100%',
                 }}
               >

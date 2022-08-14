@@ -11,59 +11,7 @@ import ThirdParty from '../models/ThirdParty';
 import Account from '../models/Account';
 import Document from '../models/Document';
 import DocumentBlob from '../models/DocumentBlob';
-
-interface AccessRequestsViewItemProps {
-  item: AccessRequest;
-  navigate: any;
-}
-
-interface AccessRequestsViewItemState {}
-
-interface FlatListItemProps {
-  item: AccessRequest;
-}
-
-class AccessRequestsViewItem extends React.Component<
-  AccessRequestsViewItemProps,
-  AccessRequestsViewItemState
-> {
-  constructor(props: AccessRequestsViewItemProps) {
-    super(props);
-    this.state = {};
-  }
-
-  render = () => {
-    const {item, navigate} = this.props;
-    return (
-      <List.Item
-        titleEllipsizeMode={'tail'}
-        descriptionEllipsizeMode={'tail'}
-        style={{
-          borderWidth: 1,
-          borderColor: color.light_grey,
-          width: '100%',
-        }}
-        title={item.formattedTitle()}
-        description={item.formattedDescription()}
-        right={(props) => {
-          return (
-            <View
-              style={{
-                borderWidth: 1,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Ionicons name={'ios-chevron-forward-outline'} size={25} color={color.light_grey} />
-            </View>
-          );
-        }}
-        onPress={() => navigate('FocusAccessRequest')}
-      />
-    );
-  };
-}
+import AccessRequestsViewItem, {FlatListItemProps} from '../components/AccessRequestListItem';
 
 interface AccessRequestsViewState {
   items: Array<AccessRequest>;

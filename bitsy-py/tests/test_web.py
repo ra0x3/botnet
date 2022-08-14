@@ -37,7 +37,7 @@ class TestWeb(BaseTestClass):
             json={
                 "pubkey": RealMetamaskAcct.compressed_pubkey,
                 "address": RealMetamaskAcct.address0,
-                "password_hash": blake3_("mypassword"),
+                "password_hash": blake3_hexdigest("mypassword"),
             },
         )
         rjson = response.json()
@@ -48,9 +48,9 @@ class TestWeb(BaseTestClass):
             (rjson["address"], rjson["password_hash"], rjson["pubkey"], rjson["created_at"], None)
         )
         assert response.status_code == status.HTTP_200_OK
-        assert account.pubkey == blake3_(recovered_pubkey.to_hex())
+        assert account.pubkey == blake3_hexdigest(recovered_pubkey.to_hex())
         assert account.address == rjson["address"]
-        assert account.password_hash == blake3_("mypassword")
+        assert account.password_hash == blake3_hexdigest("mypassword")
         assert isinstance(account.created_at, int)
 
     def test_route_create_document(self, test_account):
@@ -159,7 +159,7 @@ class TestWeb(BaseTestClass):
     def test_route_add_setting_to_account_id(self, test_account):
         account = test_account
         response = self.client.post(
-            "/setting",
+            "/account/setting",
             json={
                 "key": SettingKey.Other.value,
                 "value": 1,
@@ -184,13 +184,14 @@ class TestWeb(BaseTestClass):
         setting = add_setting_to_account(account, SettingKey.Other, 1)
         assert setting.enabled()
         response = self.client.put(
-            "/setting",
+            "/account/setting",
             json={
                 "key": SettingKey.Other.value,
             },
             headers={"Authorization": account.jwt},
         )
         rjson = response.json()
+        print(">> JSON ", rjson)
         setting = Setting.from_row(
             (
                 rjson["account"]["address"],

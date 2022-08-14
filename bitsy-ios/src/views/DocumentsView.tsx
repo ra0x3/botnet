@@ -9,6 +9,7 @@ import {
   AnimatedFAB,
   Menu,
   Divider,
+  TextInput,
 } from 'react-native-paper';
 import Dropdown from 'react-native-paper-dropdown';
 import {color} from '../const';
@@ -25,9 +26,7 @@ interface DocumentsViewItemProps {
   navigate: any;
 }
 
-interface DocumentsViewItemState {
-  renderDialogue: boolean;
-}
+interface DocumentsViewItemState {}
 
 interface FlatListItemProps {
   item: Document;
@@ -36,95 +35,106 @@ interface FlatListItemProps {
 class DocumentsViewItem extends React.Component<DocumentsViewItemProps, DocumentsViewItemState> {
   constructor(props: DocumentsViewItemProps) {
     super(props);
-    this.state = {
-      renderDialogue: false,
-    };
+    this.state = {};
   }
-
-  renderDialogue = () => {
-    const {item} = this.props;
-    if (this.state.renderDialogue) {
-      return (
-        <Portal>
-          <Dialog
-            visible={this.state.renderDialogue}
-            onDismiss={() => this.setState({renderDialogue: false})}
-          >
-            <Dialog.Title>This is a title</Dialog.Title>
-            <Dialog.Content>
-              <Paragraph>This is simple dialog</Paragraph>
-              <Paragraph>{item.blob.data}</Paragraph>
-            </Dialog.Content>
-            <Button onPress={() => this.setState({renderDialogue: false})}>Close</Button>
-          </Dialog>
-        </Portal>
-      );
-    }
-  };
 
   render = () => {
     const {item, navigate} = this.props;
     return (
-      <TouchableOpacity onPress={() => navigate('FocusedDocument', {item})}>
+      <View
+        style={{
+          borderWidth: 1,
+          borderColor: color.light_grey,
+          width: 375,
+          height: 100,
+        }}
+      >
         <View
           style={{
             borderWidth: 1,
-            borderColor: color.light_grey,
-            width: 350,
-            height: 100,
+            borderColor: 'yellow',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            flexDirection: 'row',
+            height: '100%',
+            width: '100%',
           }}
         >
           <View
             style={{
               borderWidth: 1,
-              borderColor: 'red',
-              width: '100%',
               display: 'flex',
               justifyContent: 'center',
+              alignItems: 'center',
+              width: 50,
+              height: 50,
+              borderRadius: 50,
             }}
           >
-            <Text>{item.name}</Text>
-            <Text>{item.created_at}</Text>
+            <Text>Image</Text>
           </View>
           <View
             style={{
               borderWidth: 1,
-              borderColor: 'blue',
-              width: '100%',
+              marginLeft: 10,
+              height: '100%',
+              width: 275,
               display: 'flex',
-              flexDirection: 'row',
-              justifyContent: 'space-between',
+              justifyContent: 'center',
+              alignItems: 'center',
             }}
           >
-            <Button
-              style={{width: 75, borderWidth: 1, height: 30}}
-              mode={'outlined'}
-              onPress={() => navigate('FocusedDocument', {item})}
+            <View
+              style={{
+                borderWidth: 1,
+                borderColor: 'red',
+                width: '100%',
+                display: 'flex',
+                justifyContent: 'center',
+              }}
             >
-              View
-            </Button>
+              <Text>{item.name}</Text>
+              <Text>Added on {item.created_at}</Text>
+            </View>
+            <View
+              style={{
+                borderWidth: 1,
+                borderColor: 'blue',
+                width: '100%',
+                display: 'flex',
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+              }}
+            >
+              <Button
+                style={{width: 75, borderWidth: 1, height: 30, padding: 0}}
+                labelStyle={{fontSize: 10}}
+                mode={'outlined'}
+                onPress={() => navigate('FocusedDocument', {item})}
+              >
+                View
+              </Button>
+            </View>
           </View>
         </View>
-      </TouchableOpacity>
+      </View>
     );
   };
 }
 
 interface BankCardForm {
   type: DocumentType;
-  firstName: string;
-  lastName: string;
-  address: string;
+  name: string;
   number: string;
-  ccv: string;
+  securityCode: string;
   expiry: string; // MM-YYYY
   zipCode: string;
 }
 
 interface BankAccountForm {
   type: DocumentType;
-  firstName: string;
-  lastName: string;
+  name: string;
   accountNumber: string;
   routingNumber: string;
 }
@@ -210,7 +220,36 @@ class DocumentsView extends React.Component<DocumentsViewProps, DocumentsViewSta
               alignItems: 'center',
             }}
           >
-            <Text>Bank Account</Text>
+            <View style={{borderWidth: 1, borderColor: 'orange', width: '95%', height: '95%'}}>
+              <TextInput
+                // @ts-ignore
+                onChangeText={(text) => this.setState({form: {...this.state.form, name: text}})}
+                mode="outlined"
+                style={{width: '100%', height: 40}}
+                label="Name on account"
+                value={(this.state.form as BankAccountForm).name}
+              />
+              <TextInput
+                onChangeText={(text) =>
+                  // @ts-ignore
+                  this.setState({form: {...this.state.form, routingNumber: text}})
+                }
+                value={(this.state.form as BankAccountForm).routingNumber}
+                label="Routing Number"
+                mode="outlined"
+                style={{width: '100%', height: 40}}
+              />
+              <TextInput
+                label="Account Number"
+                mode="outlined"
+                style={{width: '100%', height: 40}}
+                value={(this.state.form as BankAccountForm).accountNumber}
+                onChangeText={(text) =>
+                  // @ts-ignore
+                  this.setState({form: {...this.state.form, accountNumber: text}})
+                }
+              />
+            </View>
           </View>
         );
       case DocumentType.BankCard:
@@ -222,7 +261,69 @@ class DocumentsView extends React.Component<DocumentsViewProps, DocumentsViewSta
               alignItems: 'center',
             }}
           >
-            <Text>Bank Card</Text>
+            <View style={{borderWidth: 1, borderColor: 'orange', width: '95%', height: '95%'}}>
+              <TextInput
+                mode="outlined"
+                style={{width: '100%', height: 40}}
+                label="Name on card"
+                value={(this.state.form as BankCardForm).name}
+                onChangeText={(text) =>
+                  // @ts-ignore
+                  this.setState({form: {...this.state.form, name: text}})
+                }
+              />
+              <TextInput
+                value={(this.state.form as BankCardForm).number}
+                label="Card Number"
+                mode="outlined"
+                style={{width: '100%', height: 40}}
+                onChangeText={(text) =>
+                  // @ts-ignore
+                  this.setState({form: {...this.state.form, number: text}})
+                }
+              />
+              <View
+                style={{
+                  display: 'flex',
+                  flexDirection: 'row',
+                  borderWidth: 1,
+                  width: '100%',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
+                <TextInput
+                  mode="outlined"
+                  style={{width: 100, height: 40}}
+                  label="Expiration Date"
+                  value={(this.state.form as BankCardForm).expiry}
+                  onChangeText={(text) =>
+                    // @ts-ignore
+                    this.setState({form: {...this.state.form, expiry: text}})
+                  }
+                />
+                <TextInput
+                  mode="outlined"
+                  style={{width: 100, height: 40}}
+                  label="Security Code"
+                  value={(this.state.form as BankCardForm).securityCode}
+                  onChangeText={(text) =>
+                    // @ts-ignore
+                    this.setState({form: {...this.state.form, securityCode: text}})
+                  }
+                />
+              </View>
+              <TextInput
+                label="Zip Code"
+                mode="outlined"
+                style={{width: '100%', height: 40}}
+                value={(this.state.form as BankCardForm).zipCode}
+                onChangeText={(text) =>
+                  // @ts-ignore
+                  this.setState({form: {...this.state.form, zipCode: text}})
+                }
+              />
+            </View>
           </View>
         );
       case DocumentType.Basic:
@@ -234,7 +335,14 @@ class DocumentsView extends React.Component<DocumentsViewProps, DocumentsViewSta
               alignItems: 'center',
             }}
           >
-            <Text>Basic</Text>
+            <TextInput
+              label="Document"
+              mode="outlined"
+              multiline={true}
+              value={(this.state.form as BasicForm).text}
+              onChangeText={(text) => this.setState({form: {text, type: DocumentType.Basic}})}
+              style={{width: '100%', height: 250}}
+            />
           </View>
         );
     }
@@ -249,6 +357,7 @@ class DocumentsView extends React.Component<DocumentsViewProps, DocumentsViewSta
             borderColor: 'green',
             width: '100%',
             height: 250,
+            marginTop: 10,
           }}
         >
           {this.renderAddDocumentMenuFormInnerContent()}
@@ -265,12 +374,13 @@ class DocumentsView extends React.Component<DocumentsViewProps, DocumentsViewSta
             borderWidth: 1,
             backgroundColor: color.white,
             width: 300,
-            height: 400,
+            height: 450,
             position: 'absolute',
             zIndex: 10,
             padding: 10,
           }}
         >
+          <Text style={{textAlign: 'center', marginBottom: 10}}>Add a document</Text>
           <Dropdown
             label="Document Type"
             mode="outlined"
@@ -282,11 +392,9 @@ class DocumentsView extends React.Component<DocumentsViewProps, DocumentsViewSta
                     this.setState({
                       form: {
                         type: DocumentType.BankCard,
-                        firstName: '',
-                        lastName: '',
-                        address: '',
+                        name: '',
                         number: '',
-                        ccv: '',
+                        securityCode: '',
                         expiry: '',
                         zipCode: '',
                       },
@@ -297,8 +405,7 @@ class DocumentsView extends React.Component<DocumentsViewProps, DocumentsViewSta
                     this.setState({
                       form: {
                         type: DocumentType.BankAccount,
-                        firstName: '',
-                        lastName: '',
+                        name: '',
                         accountNumber: '',
                         routingNumber: '',
                       },
@@ -340,16 +447,32 @@ class DocumentsView extends React.Component<DocumentsViewProps, DocumentsViewSta
             }}
           />
           {this.renderAddDocumentMenuForm()}
-          <Button
-            onPress={() =>
-              this.setState({
-                renderAddDocumentMenu: false,
-                showrenderAddDocumentMenuDropdown: false,
-              })
-            }
+          <View
+            style={{
+              borderWidth: 1,
+              width: '100%',
+              display: 'flex',
+              justifyContent: 'space-evenly',
+              alignItems: 'center',
+              flexDirection: 'row',
+            }}
           >
-            Close
-          </Button>
+            <Button mode="outlined" style={{marginTop: 20}} onPress={() => {}}>
+              Save
+            </Button>
+            <Button
+              mode="outlined"
+              style={{marginTop: 10}}
+              onPress={() =>
+                this.setState({
+                  renderAddDocumentMenu: false,
+                  showrenderAddDocumentMenuDropdown: false,
+                })
+              }
+            >
+              Close
+            </Button>
+          </View>
         </View>
       );
     }

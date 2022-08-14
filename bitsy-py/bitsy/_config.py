@@ -23,20 +23,18 @@ class LogLevel(enum.Enum):
 
 
 def derive_jwt(params: Dict[str, str]):
-    expiry = dt.datetime.now() + dt.timedelta(
-        days=int(BitsyConfig.jwt_expiry_days)
-    )
+    expiry = dt.datetime.now() + dt.timedelta(days=int(BitsyConfig.jwt_expiry_days))
     params["exp"] = int(expiry.strftime("%s"))
-    return jwt.encode(
-        params, BitsyConfig.jwt_secret, algorithm=BitsyConfig.jwt_algo
-    )
+    return jwt.encode(params, BitsyConfig.jwt_secret, algorithm=BitsyConfig.jwt_algo)
 
 
 class Defaults:
     api_host: str = "127.0.0.1"
     api_port: int = 8000
     env: str = env_with_default()
-    jwt_secret: str = "77388623176251186746484687673521814216112263525741856083147157640482304445455"
+    jwt_secret: str = (
+        "77388623176251186746484687673521814216112263525741856083147157640482304445455"
+    )
     log_file: str = "bitsy.log"
     log_level: LogLevel = LogLevel.DEBUG
     pg_database: str = env_var_with_default("PG_DATABASE", "bitsy")
@@ -66,9 +64,7 @@ class BitsyConfig:
     pg_user: str = Defaults.pg_user
     vault_address: str = Defaults.vault_address
     workers: int = Defaults.workers
-    connection = create_postgres_conn(
-        pg_database, pg_user, pg_password, pg_host, pg_port
-    )
+    connection = create_postgres_conn(pg_database, pg_user, pg_password, pg_host, pg_port)
 
     def __init__(self, **kwargs):
         self.__dict__.update(kwargs)
@@ -103,9 +99,7 @@ class BitsyConfig:
         )
 
     def to_json(self) -> str:
-        object = dict(
-            [(k, v) for k, v in self.__dict__.items() if k != "connection"]
-        )
+        object = dict([(k, v) for k, v in self.__dict__.items() if k != "connection"])
         return json.dumps(object)
 
     @staticmethod
