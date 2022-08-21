@@ -30,8 +30,7 @@ class TestColumn:
             foreign_key=ForeignKey("foo", reference=ForeignKeyReference("bar", "id")),
         )
         assert (
-            column.create_fragment()
-            == "  foo integer,\n  FOREIGN KEY(foo) REFERENCES bar(id) ON DELETE NO ACTION,\n"
+            column.create_fragment() == "  foo integer,\n  FOREIGN KEY(foo) REFERENCES bar(id) ON DELETE NO ACTION,\n"
         )
 
 

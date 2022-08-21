@@ -98,9 +98,7 @@ class JwtMiddlware(BaseHTTPMiddleware):
             fail_if_not_found=True,
         )
 
-        party = Model.ThirdPartyAccount.get(
-            where={"account_address": to_checksum_address(payload["address"])}
-        )
+        party = Model.ThirdPartyAccount.get(where={"account_address": to_checksum_address(payload["address"])})
         request.state.account = account
         if party:
             request.state.party_account = party
@@ -210,9 +208,7 @@ async def route_toggle_third_party_token(request: Request):
 
 @app.get("/access-token")
 async def route_get_access_tokens_for_third_party(request: Request):
-    return Model.AccessToken.get_many(
-        where={"third_party_id": request.state.party_account.party.uuid}
-    )
+    return Model.AccessToken.get_many(where={"third_party_id": request.state.party_account.party.uuid})
 
 
 @app.delete("/access-token")
@@ -385,9 +381,7 @@ async def route_toggle_third_party_webhook(request: Request):
 @app.delete("/webhook")
 async def route_delete_third_party_webhook_id(request: Request):
     body = await request.json()
-    return delete_third_party_webhook(
-        third_party_id=request.state.party_account.party.uuid, webhook_id=body["uuid"]
-    )
+    return delete_third_party_webhook(third_party_id=request.state.party_account.party.uuid, webhook_id=body["uuid"])
 
 
 @app.post("/access-request")

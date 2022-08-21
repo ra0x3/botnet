@@ -175,9 +175,7 @@ class Table:
         stmnt = self._create_stmnt()
         cursor.execute(stmnt)
 
-    def add_index(
-        self, index_name: str, table_name: str, column_name: str, unique: bool
-    ) -> "Table":
+    def add_index(self, index_name: str, table_name: str, column_name: str, unique: bool) -> "Table":
         index = Index(index_name, unique, table_name, column_name)
         cursor = self.conn.cursor()
         cursor.execute(index.create_fragment())

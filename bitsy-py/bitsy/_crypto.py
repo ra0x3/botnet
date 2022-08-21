@@ -82,9 +82,7 @@ class Keypair:
 def eth_account_from_mnemonic(m: str, password: Optional[str] = None) -> eth_account.Account:
     # https://www.reddit.com/r/seedstorage/comments/voixjj/comment/iedodmv/?utm_source=share&utm_medium=web2x&context=3
     if password:
-        return web3.eth.account.from_mnemonic(
-            mnemonic=m, account_path="m/44'/60'/0'/0/0", passphrase=password
-        )
+        return web3.eth.account.from_mnemonic(mnemonic=m, account_path="m/44'/60'/0'/0/0", passphrase=password)
     return web3.eth.account.from_mnemonic(mnemonic=m, account_path="m/44'/60'/0'/0/0")
 
 
@@ -92,6 +90,12 @@ def mnemonic_to_pubkey(m: str, password: Optional[str] = None) -> PublicKey:
     acct = eth_account_from_mnemonic(m, password)
     privkey = eth_keys.keys.PrivateKey(acct._private_key)
     return privkey.public_key
+
+
+def keypair_func() -> Keypair:
+    acct = web3.eth.account.create()
+    privkey = eth_keys.keys.PrivateKey(acct._private_key)
+    return Keypair(privkey, privkey.public_key)
 
 
 class BaseKey:
@@ -179,9 +183,7 @@ class VaultConnection(BaseConnection):
 
     def put_hex(self, key: str):
         key_img = key_image(key)
-        self._store.secrets.kv.v2.create_or_update_secret(
-            key_img, secret={"key": decode(key, Encoding.UTF8)}
-        )
+        self._store.secrets.kv.v2.create_or_update_secret(key_img, secret={"key": decode(key, Encoding.UTF8)})
 
 
 _Connection = TypeVar(

@@ -234,9 +234,7 @@ class TestWeb(BaseTestClass):
         account = test_account
         party = create_third_party()
         document = create_document_for_account("another doc", xml_doc, account)
-        perm = grant_perms_on_existing_doc_for_third_party(
-            PermissionKey.Read, party, account, document
-        )
+        perm = grant_perms_on_existing_doc_for_third_party(PermissionKey.Read, party, account, document)
 
         _ = self.client.delete(
             "/permission",
@@ -270,9 +268,7 @@ class TestWeb(BaseTestClass):
 
     def test_route_delete_third_party_webhook_id(self, test_party_account):
         party_acct = test_party_account
-        webhook = create_third_party_webhook(
-            party_acct.party, "/foo", WebhookType.Incoming, "foo", 0
-        )
+        webhook = create_third_party_webhook(party_acct.party, "/foo", WebhookType.Incoming, "foo", 0)
 
         assert isinstance(webhook, Webhook)
 
@@ -286,9 +282,7 @@ class TestWeb(BaseTestClass):
         result = self.get_from_db(f"SELECT * FROM webhooks WHERE uuid = '{webhook.uuid}'")
         assert not result
 
-    def test_route_create_third_party_access_request_id(
-        self, xml_doc, test_account, test_party_account
-    ):
+    def test_route_create_third_party_access_request_id(self, xml_doc, test_account, test_party_account):
         from .conftest import keypair_func
 
         party_acct = test_party_account

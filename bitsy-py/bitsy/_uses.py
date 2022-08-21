@@ -67,9 +67,7 @@ def create_third_party(name: Optional[str] = None) -> ThirdParty:
     return party
 
 
-def create_access_token_for_third_party_id(
-    party_id: str, name: Optional[str] = None
-) -> AccessToken:
+def create_access_token_for_third_party_id(party_id: str, name: Optional[str] = None) -> AccessToken:
     party = ThirdParty.get(where={"uuid": party_id})
     return create_access_token_for_third_party(party=party, name=name)
 
@@ -94,9 +92,7 @@ def create_third_party_account(
 
 # IMPORTANT: This will always store the account pubkey in the vault
 @use_case
-def create_account_using_mnemnonic(
-    mnemonic: str, password: str, for_third_party: bool = False
-) -> Account:
+def create_account_using_mnemnonic(mnemonic: str, password: str, for_third_party: bool = False) -> Account:
     pubkey = mnemonic_to_pubkey(m=mnemonic, password=password)
     password_hash = blake3_hexdigest(password)
     account = create_account(
@@ -146,9 +142,7 @@ def add_setting_to_account(account: Account, key: SettingKey, value: int) -> Set
 
 
 @use_case
-def verify_nonce_signature(
-    nonce: str, signature: str, input: str, address: str
-) -> Optional[Account]:
+def verify_nonce_signature(nonce: str, signature: str, input: str, address: str) -> Optional[Account]:
     defunct_digest = defunct_hash_message(text=input)
     derived = web3.eth.account.recoverHash(defunct_digest, signature=signature)
     if to_checksum_address(derived) == address:
@@ -176,9 +170,7 @@ def toggle_account_setting_id(account_address: str, key: SettingKey) -> Setting:
 
 
 @use_case
-def create_access_token_for_third_party(
-    party: ThirdParty, name: Optional[str] = None
-) -> AccessToken:
+def create_access_token_for_third_party(party: ThirdParty, name: Optional[str] = None) -> AccessToken:
     token = create_access_token(party=party, name=name)
     return token
 
@@ -230,12 +222,8 @@ def get_document_with_access_requests(cid: str, account_address: str) -> Dict[st
 def create_document_for_account(name: str, data: str, account: Account) -> Document:
     cid = blake3_hexdigest(uuid4())
     bundle = fernet_bundle()
-    ciphertext = decode(
-        s=bundle.key.encrypt(encode(s=data, encoding=Encoding.UTF8)), encoding=Encoding.UTF8
-    )
-    document = Document(
-        cid=cid, name=name, blob=DocumentBlob(ciphertext), account=account, key_img=bundle.key_img
-    )
+    ciphertext = decode(s=bundle.key.encrypt(encode(s=data, encoding=Encoding.UTF8)), encoding=Encoding.UTF8)
+    document = Document(cid=cid, name=name, blob=DocumentBlob(ciphertext), account=account, key_img=bundle.key_img)
     document.save()
     _ = keystore.put_hex(bundle.hexkey)
     return document
@@ -247,9 +235,7 @@ def create_document_for_account_id(name: str, account_address: str, data: str) -
 
 
 @use_case
-def third_party_access_document_id(
-    third_party_id: str, document_cid: str, account_address: str
-) -> Optional[Document]:
+def third_party_access_document_id(third_party_id: str, document_cid: str, account_address: str) -> Optional[Document]:
     perm = Permission.get(
         where={
             "document_cid": document_cid,
@@ -339,9 +325,7 @@ def grant_perms_on_new_doc_for_third_party_id(
 ) -> Permission:
     account = Account.get(where={"address": account_address})
     party = ThirdParty.get(where={"uuid": party_id})
-    return grant_perms_on_new_doc_for_third_party(
-        key=key, party=party, name=name, data=data, account=account, ttl=ttl
-    )
+    return grant_perms_on_new_doc_for_third_party(key=key, party=party, name=name, data=data, account=account, ttl=ttl)
 
 
 @use_case
@@ -407,9 +391,7 @@ def revoke_perms_on_existing_doc_for_third_party_id(
 ) -> Any:
     party = ThirdParty.get(where={"uuid": party_id})
     account = Account.get(where={"address": account_address})
-    return revoke_perms_on_existing_doc_for_third_party(
-        party=party, document_id=document_id, account=account, key=key
-    )
+    return revoke_perms_on_existing_doc_for_third_party(party=party, document_id=document_id, account=account, key=key)
 
 
 @use_case
@@ -419,9 +401,7 @@ def new_access_token_for_third_party(party: ThirdParty, name: Optional[str] = No
 
 
 @use_case
-def revoke_third_party_perms_on_account(
-    key: PermissionKey, account: Account, party: ThirdParty
-) -> Permission:
+def revoke_third_party_perms_on_account(key: PermissionKey, account: Account, party: ThirdParty) -> Permission:
     perm = Permission.update(
         update={"value": 0},
         where={
@@ -453,9 +433,7 @@ def update_existing_doc_for_account(account: Account, blob: str, document: Docum
     return doc
 
 
-def update_existing_doc_for_account_id(
-    account_address: str, blob: str, document_id: str
-) -> Document:
+def update_existing_doc_for_account_id(account_address: str, blob: str, document_id: str) -> Document:
     account = Account.get(where={"address": account_address})
     document = Document.get(where={"cid": document_id})
     return update_existing_doc_for_account(account=account, blob=blob, document=document)
@@ -472,12 +450,8 @@ def register_new_account(privkey: PublicKey) -> Account:
 
 
 @use_case
-def create_third_party_webhook(
-    party: ThirdParty, endpoint: str, type: WebhookType, name: str, active: int
-) -> Webhook:
-    hook = Webhook(
-        uuid=uuid4(), third_party=party, endpoint=endpoint, type=type, name=name, active=active
-    )
+def create_third_party_webhook(party: ThirdParty, endpoint: str, type: WebhookType, name: str, active: int) -> Webhook:
+    hook = Webhook(uuid=uuid4(), third_party=party, endpoint=endpoint, type=type, name=name, active=active)
     hook.save()
     return hook
 
@@ -496,16 +470,12 @@ def toggle_third_party_webhook(third_party_id: str, webhook_id: str) -> Webhook:
     return hook
 
 
-def create_third_party_webhook_id(
-    party_id: str, endpoint: str, type: WebhookType, name: str, active: int
-) -> Webhook:
+def create_third_party_webhook_id(party_id: str, endpoint: str, type: WebhookType, name: str, active: int) -> Webhook:
     party = ThirdParty.get(where={"uuid": party_id})
     if not party:
         raise ResourceDoesNotExist("Party({}) not found.".format(party_id))
 
-    return create_third_party_webhook(
-        party=party, endpoint=endpoint, type=type, name=name, active=active
-    )
+    return create_third_party_webhook(party=party, endpoint=endpoint, type=type, name=name, active=active)
 
 
 @use_case

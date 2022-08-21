@@ -45,15 +45,11 @@ class TestUsesCases(BaseTestClass):
 
     @pytest.mark.skip(reason="Account already exists")
     def test_can_create_account_using_mnemnonic(self):
-        account = create_account_using_mnemnonic(
-            RealMetamaskAcct.mnemonic, RealMetamaskAcct.password
-        )
+        account = create_account_using_mnemnonic(RealMetamaskAcct.mnemonic, RealMetamaskAcct.password)
         assert isinstance(account, Account)
 
         pubkey = mnemonic_to_pubkey(RealMetamaskAcct.mnemonic, RealMetamaskAcct.password)
-        result = self.get_from_db(
-            f"SELECT * FROM accounts WHERE pubkey = '{key_image(pubkey.to_hex())}'"
-        )
+        result = self.get_from_db(f"SELECT * FROM accounts WHERE pubkey = '{key_image(pubkey.to_hex())}'")
         assert len(result) == 1
 
         get_account = Account.from_row(result[0])
@@ -66,17 +62,13 @@ class TestUsesCases(BaseTestClass):
         keypair = keypair_func()
         account = create_account(pubkey=keypair.pubkey, password_hash="123")
 
-        result = Account.from_row(
-            self.get_from_db(f"SELECT * FROM accounts WHERE address = '{account.address}'")[0]
-        )
+        result = Account.from_row(self.get_from_db(f"SELECT * FROM accounts WHERE address = '{account.address}'")[0])
         assert result.pubkey == account.pubkey
 
         keypair = keypair_func()
         account = create_account(address=keypair.address, password_hash="123")
 
-        result = Account.from_row(
-            self.get_from_db(f"SELECT * FROM accounts WHERE address = '{account.address}'")[0]
-        )
+        result = Account.from_row(self.get_from_db(f"SELECT * FROM accounts WHERE address = '{account.address}'")[0])
         assert result.address == account.address
 
     def test_can_create_store_get_document(self, xml_doc, test_account):
@@ -99,13 +91,9 @@ class TestUsesCases(BaseTestClass):
         account = test_account
         party = create_third_party()
         _ = create_access_token_for_third_party(party)
-        perm = grant_perms_on_new_doc_for_third_party(
-            PermissionKey.Other, party, "my doc", "hello world", account, 12
-        )
+        perm = grant_perms_on_new_doc_for_third_party(PermissionKey.Other, party, "my doc", "hello world", account, 12)
 
-        result = self.get_from_db(
-            f"SELECT * FROM permissions WHERE document_cid = '{perm.document.cid}';"
-        )
+        result = self.get_from_db(f"SELECT * FROM permissions WHERE document_cid = '{perm.document.cid}';")
         assert len(result) == 1
 
         get_perm = Permission.from_row(result[0])
@@ -124,9 +112,7 @@ class TestUsesCases(BaseTestClass):
         perm = grant_perms_on_existing_doc_for_third_party(PermissionKey.Other, party, account, doc)
         assert isinstance(perm, Permission)
 
-        result = self.get_from_db(
-            f"SELECT * FROM permissions WHERE document_cid = '{perm.document.cid}';"
-        )
+        result = self.get_from_db(f"SELECT * FROM permissions WHERE document_cid = '{perm.document.cid}';")
 
         get_perm = Permission.from_row(result[0])
         assert perm.uuid == get_perm.uuid
@@ -139,9 +125,7 @@ class TestUsesCases(BaseTestClass):
         result = new_access_token_for_third_party(party)
         assert token.uuid != result.uuid
 
-        result = self.get_from_db(
-            f"SELECT * FROM access_tokens WHERE third_party_id = '{result.third_party.uuid}';"
-        )
+        result = self.get_from_db(f"SELECT * FROM access_tokens WHERE third_party_id = '{result.third_party.uuid}';")
 
         assert len(result) >= 1
 
@@ -149,9 +133,7 @@ class TestUsesCases(BaseTestClass):
         account = test_account
         party = create_third_party()
         _ = create_access_token_for_third_party(party)
-        perm = grant_perms_on_new_doc_for_third_party(
-            PermissionKey.Other, party, "doc-123", "hello world", account, 12
-        )
+        perm = grant_perms_on_new_doc_for_third_party(PermissionKey.Other, party, "doc-123", "hello world", account, 12)
 
         updated_perm = revoke_third_party_perms_on_account(PermissionKey.Other, account, party)
 
@@ -183,9 +165,7 @@ class TestUsesCases(BaseTestClass):
         account = test_account
         party = create_third_party()
         document = create_document_for_account("my doc", xml_doc, account)
-        _ = grant_perms_on_existing_doc_for_third_party(
-            PermissionKey.Read, party, account, document
-        )
+        _ = grant_perms_on_existing_doc_for_third_party(PermissionKey.Read, party, account, document)
         updated_doc = third_party_access_document_id(party.uuid, document.cid, account.address)
 
         hexkey = keystore.get_hex(updated_doc.key_img)
@@ -199,9 +179,7 @@ class TestUsesCases(BaseTestClass):
         account = test_account
         party = create_third_party()
         document = create_document_for_account("foo", xml_doc, account)
-        _ = grant_perms_on_existing_doc_for_third_party(
-            PermissionKey.Read, party, account, document
-        )
+        _ = grant_perms_on_existing_doc_for_third_party(PermissionKey.Read, party, account, document)
 
         stats = get_stats_for_account(account)
         assert isinstance(stats, AccountStat)
@@ -215,9 +193,7 @@ class TestUsesCases(BaseTestClass):
         assert isinstance(setting, Setting)
         assert setting.account.address == account.address
 
-        results = self.get_from_db(
-            f"SELECT * FROM settings WHERE account_address = '{account.address}'"
-        )
+        results = self.get_from_db(f"SELECT * FROM settings WHERE account_address = '{account.address}'")
         get_setting = Setting.from_row(results[0])
 
         assert get_setting.enabled()
@@ -234,9 +210,7 @@ class TestUsesCases(BaseTestClass):
         account = test_account
         party = create_third_party()
         document = create_document_for_account("doc-543", xml_doc, account)
-        perm = grant_perms_on_existing_doc_for_third_party(
-            PermissionKey.Read, party, account, document
-        )
+        perm = grant_perms_on_existing_doc_for_third_party(PermissionKey.Read, party, account, document)
 
         get_perm = self.get_from_db(f"SELECT * FROM permissions WHERE uuid = '{perm.uuid}';")
         assert get_perm is not None

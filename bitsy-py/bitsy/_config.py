@@ -32,9 +32,7 @@ class Defaults:
     api_host: str = "127.0.0.1"
     api_port: int = 8000
     env: str = env_with_default()
-    jwt_secret: str = (
-        "77388623176251186746484687673521814216112263525741856083147157640482304445455"
-    )
+    jwt_secret: str = "77388623176251186746484687673521814216112263525741856083147157640482304445455"
     log_file: str = "bitsy.log"
     log_level: LogLevel = LogLevel.DEBUG
     pg_database: str = env_var_with_default("PG_DATABASE", "bitsy")
