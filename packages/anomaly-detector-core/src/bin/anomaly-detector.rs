@@ -69,9 +69,9 @@ async fn main() -> AnomalyDetectorResult<()> {
         )
         .build();
 
-    let mut db = InMemory::<HttpKey>::new();
+    let db = InMemory::<HttpKey>::new();
     db.set_metadata(key.clone()).await?;
-    db.set(key, Bytes::default()).await?;
+
 
     // online
     let input = Input::new(
