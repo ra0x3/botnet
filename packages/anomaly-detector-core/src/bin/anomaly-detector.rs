@@ -1,5 +1,5 @@
 use anomaly_detector_core::{database::InMemory, prelude::*, KeyMetadata};
-use anomaly_detector_macros::{extractor, task};
+use anomaly_detector_macros::{extractor, key, task};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -25,59 +25,12 @@ fn extract(input: &Input) -> AnomalyDetectorResult<Field> {
     extract_url_param("mkt", input)
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Clone)]
+
+#[key]
 struct HttpKey {
     fields: Vec<Field>,
     metadata: KeyMetadata,
     type_id: usize,
-}
-
-impl Key for HttpKey {
-    type Item = Field;
-    type Metadata = KeyMetadata;
-    type TypeId = usize;
-
-    fn new(name: &str) -> Self {
-        Self {
-            fields: Vec::new(),
-            metadata: KeyMetadata::default(),
-            type_id: type_id(name),
-        }
-    }
-
-    fn metadata(&mut self, meta: KeyMetadata) -> &mut Self {
-        self.metadata = KeyMetadata::with_key_code(meta, self.type_id);
-        self
-    }
-
-    fn field(&mut self, f: Self::Item) -> &mut Self {
-        self.fields.push(f);
-        self
-    }
-
-    fn build(&self) -> Self {
-        self.clone()
-    }
-
-    fn flatten(&self) -> Bytes {
-        Bytes::from(
-            self.fields
-                .iter()
-                .map(|f| usize::to_le_bytes(f.type_id).to_vec())
-                .collect::<Vec<Vec<u8>>>()
-                .into_iter()
-                .flatten()
-                .collect::<Vec<u8>>(),
-        )
-    }
-
-    fn get_metadata(&self) -> Self::Metadata {
-        self.metadata.clone()
-    }
-
-    fn type_id(&self) -> Self::TypeId {
-        self.type_id
-    }
 }
 
 #[task(Counter)]
