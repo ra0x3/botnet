@@ -1,30 +1,14 @@
 use anomaly_detector_core::{database::InMemory, prelude::*, KeyMetadata};
-use anomaly_detector_macros::{extractor, key, task};
+use anomaly_detector_macros::{key, task};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-fn extract_url_param(param: &str, input: &Input) -> AnomalyDetectorResult<Field> {
+fn extract_url_param(input: &Input) -> AnomalyDetectorResult<Field> {
     let url = Url::parse(input.as_ref())?;
     let params: HashMap<_, _> = url.query_pairs().into_owned().collect();
-    let value = params.get(param).unwrap().to_owned();
-    Ok(Field::new(param, Bytes::from(value)))
+    let value = params.get("ssl").unwrap().to_owned();
+    Ok(Field::new("http", "ssl", Bytes::from(value)))
 }
-
-#[extractor(UserAgent)]
-fn extract(input: &Input) -> AnomalyDetectorResult<Field> {
-    extract_url_param("user_agent", input)
-}
-
-#[extractor(SSL)]
-fn extract(input: &Input) -> AnomalyDetectorResult<Field> {
-    extract_url_param("ssl", input)
-}
-
-#[extractor(Market)]
-fn extract(input: &Input) -> AnomalyDetectorResult<Field> {
-    extract_url_param("mkt", input)
-}
-
 
 #[key]
 struct HttpKey {
@@ -43,6 +27,8 @@ async fn run(
 
 #[tokio::main]
 async fn main() -> AnomalyDetectorResult<()> {
+    let mut extractors = Extractors::new();
+    extractors.add("ssl", extract_url_param);
     // offline
     let key = HttpKey::new("http")
         .metadata(
@@ -69,18 +55,21 @@ async fn main() -> AnomalyDetectorResult<()> {
         )
         .build();
 
-    let db = InMemory::<HttpKey>::new();
-    db.set_metadata(key.clone()).await?;
+    let key2 = key.clone();
+    let flat = key2.flatten();
 
+    let mut db = InMemory::new();
+    db.set_key(key, Bytes::new()).await?;
+    db.set_bytes(flat, Bytes::new()).await?;
+    // db.set_metadata(key.clone()).await?;
 
     // online
-    let input = Input::new(
-        "http://google.com?foo=true&ssl=zoo&z=shoo&shoo=baz&baz=123&user_agent=ua1&mkt=US",
-    );
-    let _key = HttpKey::new("http")
-        .field(UserAgentExtractor::extract(&input)?)
-        .field(SSLExtractor::extract(&input)?)
-        .field(MarketExtractor::extract(&input)?);
+    let input: Input = "http://google.com?foo=true&ssl=zoo&z=shoo&shoo=baz&baz=123&user_agent=ua1&mkt=US".into();
+    let foo = HttpKey::from_input("http", input, extractors)?;
+    // let _key = HttpKey::new("http")
+    //     .field(UserAgentExtractor::extract(&input)?)
+    //     .field(SSLExtractor::extract(&input)?)
+    //     .field(MarketExtractor::extract(&input)?);
 
     Ok(())
 }

@@ -2,7 +2,7 @@ pub mod database;
 pub mod task;
 pub mod utils;
 
-pub use crate::database::Database;
+pub use crate::database::{Database, FoobarZoo};
 pub use async_std::sync::{Arc, Mutex};
 pub use bytes::Bytes;
 pub use nom::AsBytes;
@@ -14,7 +14,7 @@ use std::{
 };
 use thiserror::Error;
 pub use url::Url;
-use utils::type_id;
+use utils::{fn_name, type_id};
 
 pub struct Input(pub Bytes);
 
@@ -30,8 +30,8 @@ pub mod prelude {
     pub use super::{
         task::Task,
         utils::{type_id, values_to_bytes},
-        AnomalyDetectorResult, Arc, AsBytes, Bytes, Database, Extractor, Field,
-        FieldMeta, Input, Key, Mutex, Url, Value,
+        AnomalyDetectorResult, Arc, AsBytes, Bytes, Database, Extractor, Extractors,
+        Field, FieldMeta, FieldType, FoobarZoo, Input, Key, KeyType, Mutex, Url, Value,
     };
 }
 
@@ -40,6 +40,13 @@ impl AsRef<str> for Input {
         std::str::from_utf8(self.0.as_bytes()).expect("Bad input.")
     }
 }
+
+impl From<&'static str> for Input {
+    fn from(value: &'static str) -> Self {
+        Self::new(value)
+    }
+}
+
 pub trait AsValue {
     fn as_value(&self) -> Bytes;
 }
@@ -71,11 +78,23 @@ pub enum AnomalyDetectorError {
     ParseError(#[from] url::ParseError),
     #[error("BincodeError: {0:#?}")]
     BincodeError(#[from] bincode::Error),
+    #[error("Utf8Error: {0:#?}")]
+    Utf8Error(#[from] std::str::Utf8Error),
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone, Eq)]
 pub struct ValueMap {
     items: HashMap<usize, Bytes>,
+}
+
+impl ValueMap {
+    pub fn from_values(v: Vec<Bytes>) -> Self {
+        Self {
+            items: HashMap::from_iter(
+                v.iter().map(|v| (type_id(v.as_bytes()), v.clone())),
+            ),
+        }
+    }
 }
 
 impl Hash for ValueMap {
@@ -98,6 +117,16 @@ impl PartialEq for ValueMap {
     }
 }
 
+pub enum KeyType {
+    Compressed,
+    Decompressed,
+}
+
+pub enum FieldType {
+    Compressed,
+    Decompressed,
+}
+
 #[derive(Debug, Serialize, Deserialize, Default, Clone, Eq, PartialEq, Hash)]
 pub struct FieldMeta {
     name: String,
@@ -112,11 +141,7 @@ impl FieldMeta {
         Self {
             name: name.to_string(),
             key: key.to_string(),
-            value_map: ValueMap {
-                items: HashMap::from_iter(
-                    values.iter().map(|v| (type_id(v.as_bytes()), v.clone())),
-                ),
-            },
+            value_map: ValueMap::from_values(values),
             type_id: utils::type_id(key),
             description: description.to_string(),
         }
@@ -176,16 +201,18 @@ impl KeyMetadata {
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone, Eq, PartialEq, Hash)]
 pub struct Field {
+    pub key_name: String,
     pub type_id: usize,
-    pub key: String,
+    pub field_name: String,
     pub value: Bytes,
 }
 
 impl Field {
-    pub fn new(key: &str, value: Bytes) -> Self {
+    pub fn new(key_name: &str, field_name: &str, value: Bytes) -> Self {
         Self {
-            type_id: utils::type_id(key),
-            key: key.to_string(),
+            key_name: key_name.to_string(),
+            type_id: type_id(key_name),
+            field_name: field_name.to_string(),
             value,
         }
     }
@@ -195,6 +222,7 @@ pub trait Key {
     type Item;
     type Metadata;
     type TypeId;
+    type Type;
 
     fn build(&self) -> Self;
     fn field(&mut self, f: Self::Item) -> &mut Self;
@@ -204,7 +232,37 @@ pub trait Key {
     fn new(name: &str) -> Self;
     fn type_id(&self) -> Self::TypeId;
 }
+pub struct Extractor {
+    key: String,
+    func: fn(&Input) -> AnomalyDetectorResult<Field>,
+}
 
-pub trait Extractor {
-    fn extract(input: &Input) -> AnomalyDetectorResult<Field>;
+impl Extractor {
+    pub fn new(key: &str, func: fn(&Input) -> AnomalyDetectorResult<Field>) -> Self {
+        Self {
+            key: key.to_string(),
+            func,
+        }
+    }
+
+    pub fn call(&self, input: &Input) -> AnomalyDetectorResult<Field> {
+        (self.func)(input)
+    }
+}
+
+pub struct Extractors {
+    pub items: HashMap<String, Extractor>,
+}
+
+impl Extractors {
+    pub fn new() -> Self {
+        Self {
+            items: HashMap::default(),
+        }
+    }
+
+    pub fn add(&mut self, key: &str, value: fn(&Input) -> AnomalyDetectorResult<Field>) {
+        self.items
+            .insert(key.to_string(), Extractor::new(key, value));
+    }
 }

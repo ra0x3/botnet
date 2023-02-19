@@ -6,7 +6,7 @@ use serde_json::Value;
 pub trait Task<K, D>
 where
     K: Key + std::cmp::Eq + std::hash::Hash + Send + Sync,
-    D: Database<K> + Send + Sync,
+    D: Database + Send + Sync,
 {
     type Database;
 

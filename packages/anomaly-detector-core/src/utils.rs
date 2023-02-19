@@ -11,3 +11,7 @@ pub fn values_to_bytes<T: AsValue + Clone>(v: Vec<T>) -> Vec<Bytes> {
         .map(|v| v.clone().as_value())
         .collect::<Vec<Bytes>>()
 }
+
+pub fn fn_name(key: &str, prop: &str) -> String {
+    format!("{key}:{prop}")
+}
