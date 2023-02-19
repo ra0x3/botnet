@@ -7,12 +7,12 @@ on:
   pull_request:
   release:
     types: [published]
-
 env:
-  DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432
+  DASEL_VERSION: https://github.com/TomWright/dasel/releases/download/v1.24.3/dasel_linux_amd64
   CARGO_TERM_COLOR: always
   RUSTFLAGS: -D warnings
   REGISTRY: ghcr.io
+  BRANCH_NAME: ${{ github.head_ref || github.ref_name }} 
 
 jobs:
   cancel-previous-runs:
@@ -23,160 +23,86 @@ jobs:
         with:
           access_token: ${{ github.token }}
 
-  bitsy-rs:
-    needs: cancel-previous-runs
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:latest
-        env:
-          POSTGRES_DB: bitsy
-          POSTGRES_PASSWORD: postgres
-        ports:
-          - 5432:5432
-        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-
-      - name: Install rust
-        uses: actions-rs/install@v0.1
-        with:
-          crate: cargo-audit
-          version: latest
-      - run: |
-          cd bitsy-rs
-          cargo check --locked --workspace --all-features --all-targets
-      - run: |
-          cd bitsy-rs
-          cargo build --locked --workspace --all-features --all-targets
-      - run: |
-          cd bitsy-rs
-          cargo test --locked --workspace
-        env:
-          RUSTFLAGS: "-D warnings"
-
-  bitsy-py:
+  cargo-toml-fmt-check:
     needs:
       - cancel-previous-runs
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:latest
-        env:
-          POSTGRES_DB: bitsy
-          POSTGRES_PASSWORD: postgres
-        ports:
-          - 5432:5432
-        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-
-      - name: Setup Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: "3.9"
-
-      - name: Install pipenv
-        run: |
-          python -m pip install --upgrade pipenv wheel
-
-      - id: cache-pipenv
-        uses: actions/cache@v1
-        with:
-          path: ~/.local/share/virtualenvs
-          key: ${{ runner.os }}-pipenv-${{ hashFiles('**/Pipfile.lock') }}
-
-      - name: Install dependencies
-        run: |
-          cd bitsy-py/
-          pipenv install --deploy --dev
-
-      - name: Run test suite
-        run: |
-          cd bitsy-py/
-          # ENV=ci pipenv run test -v
-
-  bitsy-www:
-    needs:
-      - cancel-previous-runs
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-
-      - name: Yarn cache
-        uses: c-hive/gha-yarn-cache@v2
-        with:
-          directory: ./bitsy-www/bitsy
-
-      - name: Setup node
-        uses: actions/setup-node@v1
-        with:
-          node-version: "16.11.0"
-      - run: |
-          cd bitsy-www/bitsy/
-          yarn install --frozen-lockfile
-          CI=false yarn build
-
-  bitsy-ios:
-    runs-on: macOS-latest
     steps:
       - uses: actions/checkout@v2
-      
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v1
+      - name: Install Cargo.toml linter
+        uses: baptiste0928/cargo-install@v1
+        with:
+          crate: cargo-toml-lint
+          version: '0.1'
+      - name: Run Cargo.toml linter
+        run: git ls-files | grep Cargo.toml$ | xargs --verbose -n 1 cargo-toml-lint
 
-  publish-docker-images:
-    runs-on: ubuntu-latest
+  get-workspace-members:
     needs:
-      - cancel-previous-runs
-      - bitsy-rs
-      - bitsy-py
-      - bitsy-www
-    strategy:
-      matrix:
-        job:
-          - os: ubuntu-latest
-            tag: ralston3/bitsy:rs-latest
-            dockerfile: sysadmin/docker/Dockerfile.bitsy.rs
-            context: ./bitsy-rs
-          - os: ubuntu-latest
-            tag: ralston3/bitsy:py-latest
-            dockerfile: sysadmin/docker/Dockerfile.bitsy.py
-            context: ./bitsy-py
-          - os: ubuntu-latest
-            tag: ralston3/bitsy:www-latest
-            dockerfile: sysadmin/docker/Dockerfile.bitsy.www
-            context: ./bitsy-www/bitsy
-
+      - cargo-toml-fmt-check
+    runs-on: ubuntu-latest
+    outputs:
+      members: ${{ steps.set-members.outputs.members }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+      - id: set-members
+        run: |
+          # install dasel
+          curl -sSLf "$DASEL_VERSION" -L -o dasel && chmod +x dasel
+          mv ./dasel /usr/local/bin/dasel
+          members=$(cat Cargo.toml | dasel -r toml -w json 'workspace.members' | jq -r ".[]" | xargs -I '{}' dasel -f {}/Cargo.toml 'package.name' | jq -R '[.]' | jq -s -c 'add')
+          echo "members=$members" >> $GITHUB_OUTPUT
 
-      - name: Set up Docker Buildx
-        id: buildx
-        uses: docker/setup-buildx-action@v1
+  cargo-verifications:
+    runs-on: ubuntu-latest
+    needs:
+      - cancel-previous-runs
+      - get-workspace-members
+    if: github.event_name != 'release' && github.event.action != 'published'
+    strategy:
+      matrix:
+        package: ${{ fromJSON(needs.get-workspace-members.outputs.members) }}
+        include:
+          - command: fmt
+            args: --all --verbose -- --check
+          - command: clippy
+            args: --all-features --all-targets
+          - command: check
+            args: --all-features --locked --workspace --all-targets
+          - command: build
+            args: --locked --workspace --all-features --all-targets
 
-      - name: DockerHub Login
-        uses: docker/login-action@v1
+    # disallow any job that takes longer than 45 minutes
+    timeout-minutes: 45
+    continue-on-error: ${{ matrix.skip-error || false }}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
         with:
-          username: ralston3
-          password: ${{ secrets.DOCKER_ACCESS_TOKEN }}
+          profile: minimal
+          toolchain: stable
 
-      - name: Github registry login
-        uses: docker/login-action@v1
+      - name: ${{ matrix.command }} ${{ matrix.args }}
+        uses: actions-rs/cargo@v1
         with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          command: ${{ matrix.command }}
+          args: ${{ matrix.args }}
 
-      - name: Build and push
-        uses: docker/build-push-action@v2
+      - name: Notify if Job Fails
+        uses: ravsamhq/notify-slack-action@v2
+        if: always() && github.ref == 'refs/heads/master'
         with:
-          context: ${{ matrix.job.context }}
-          file: ${{ matrix.job.dockerfile }}
-          tags: ${{ matrix.job.tag }}
-          push: ${{ github.ref == 'refs/heads/main' }}
-          load: true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          status: ${{ job.status }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          notification_title: '{workflow} has {status_message}'
+          message_format: '{emoji} *{workflow}* {status_message} in <{repo_url}|{repo}> : <{run_url}|View Run Results>'
+          footer: ''
+          notify_when: 'failure'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_NOTIFY_BUILD }}
+          RUSTFLAGS: -D warnings
