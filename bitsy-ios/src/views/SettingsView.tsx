@@ -1,13 +1,14 @@
 import React from 'react';
 import {View, SafeAreaView, StatusBar, FlatList, Text} from 'react-native';
-import {List, Switch} from 'react-native-paper';
+import {List, Switch, Appbar} from 'react-native-paper';
 import {color} from '../const';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import SearchBar from '../components/SearchBar';
-import {generateFakeItems} from '../utils';
-import {NavigationProps} from '../global';
+import {generateFakeItems, httpRequest} from '../utils';
+import {ActionState, ErrorMessage, NavigationProps, Option} from '../global';
 import Account from '../models/Account';
 import Setting from '../models/Setting';
+import Session from '../services/Session';
 
 interface SettingsViewItemProps {
   item: Setting;
@@ -62,6 +63,9 @@ class SettingsViewItem extends React.Component<SettingsViewItemProps, SettingsVi
 interface SettingsViewState {
   items: Array<Setting>;
   query: string;
+  actionState: ActionState;
+  error: Option<ErrorMessage>;
+  account: Option<Account>;
 }
 
 interface SettingsViewProps extends NavigationProps {}
@@ -71,14 +75,10 @@ class SettingsView extends React.Component<SettingsViewProps, SettingsViewState>
     super(props);
     this.state = {
       query: '',
-      items: generateFakeItems(
-        new Setting(
-          'BitsyVaultDeletegation',
-          true,
-          new Account('0x123', '0x3333', 'mypassword', 123, '', null),
-        ),
-        20,
-      ),
+      error: null,
+      account: null,
+      actionState: ActionState.none,
+      items: [],
     };
 
     this.navigate = this.navigate.bind(this);
@@ -89,6 +89,30 @@ class SettingsView extends React.Component<SettingsViewProps, SettingsViewState>
 
   navigate = (view: string) => {
     this.props.navigation.navigate(view);
+  };
+
+  componentDidMount = async () => {
+    const account = await Session.getSession();
+
+    this.setState({actionState: ActionState.pending, account}, async () => {
+      const {data, error} = await httpRequest({
+        url: '/account/setting',
+        method: 'GET',
+        headers: {
+          Authorization: this.state?.account!.jwt,
+        },
+      });
+
+      if (error) {
+        this.setState({error, actionState: ActionState.error});
+        return;
+      }
+
+      this.setState({
+        items: data.map((item: any, i: number) => Setting.fromObject(item)),
+        actionState: ActionState.success,
+      });
+    });
   };
 
   renderItem = ({item}: FlatListItemProps) => {
@@ -132,12 +156,16 @@ class SettingsView extends React.Component<SettingsViewProps, SettingsViewState>
           }}
         >
           <View style={{borderWidth: 1, borderColor: 'red', height: 100, width: '100%'}}>
+            <Appbar.Header>
+              <Appbar.Content title="Settings" subtitle={'Manage your account settings'} />
+            </Appbar.Header>
             <SearchBar onChangeText={this.onSearchChange} query={this.state.query} />
           </View>
           <View
             style={{
               display: 'flex',
               width: '100%',
+              height: '100%',
               borderWidth: 1,
               borderColor: 'blue',
             }}

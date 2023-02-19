@@ -48,11 +48,7 @@ class Environment(enum.Enum):
 
 
 def env_with_default() -> Environment:
-    return (
-        Environment.Development.value
-        if "ENV" not in os.environ
-        else env_var("ENV")
-    )
+    return Environment.Development.value if "ENV" not in os.environ else env_var("ENV")
 
 
 def load_dot_env():
@@ -63,9 +59,7 @@ def load_dot_env():
     load_dotenv(env_path)
 
 
-def create_postgres_conn(
-    database: str, user: str, password: str, host: str, port: str
-):
+def create_postgres_conn(database: str, user: str, password: str, host: str, port: str):
     try:
         return psycopg2.connect(
             database=database,
@@ -97,7 +91,7 @@ def remove_file(paths: List[str]):
 
 
 # FIXME: Obviously this is a no-no
-def blake3_(input: Union[str, bytes]) -> str:
+def blake3_hexdigest(input: Union[str, bytes]) -> str:
     digest: str
     if isinstance(input, str):
         digest: str = blake3(input.encode()).hexdigest()

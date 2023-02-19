@@ -16,97 +16,12 @@ from ._utils import *
 
 # IMPORTANT: FastAPI module should match definitions in _models.py
 
-
 logger = logging.getLogger("bitsy.web")
 
 
 class HttpMethod(enum.Enum):
     GET = "GET"
     POST = "POST"
-
-
-@strawberry.type
-class ThirdParty(BaseModel):
-    uuid: str
-    name: str
-
-
-@strawberry.type
-class AccessToken(BaseModel):
-    uuid: str
-    name: str
-    expiry: int
-    third_party: ThirdParty
-    active: bool
-
-
-@strawberry.type
-class Account(BaseModel):
-    address: str
-    password_hash: str
-    created_at: int
-    nonce: Optional[str]
-    jwt: Optional[str]
-    pubkey: Optional[str]
-
-
-@strawberry.type
-class DocumentBlob(BaseModel):
-    data: str
-
-
-@strawberry.type
-class Document(BaseModel):
-    cid: str
-    name: str
-    blob: DocumentBlob
-    account: Account
-    key_image: str
-    created_at: int
-
-
-@strawberry.type
-class Permission(BaseModel):
-    uuid: str
-    key: str
-    document: Document
-    value: int
-    account: Account
-    third_party: ThirdParty
-    created_at: int
-
-
-@strawberry.type
-class Setting(BaseModel):
-    id: int
-    key: SettingKey
-    value: int
-
-
-@strawberry.type
-class Webhook(BaseModel):
-    uuid: str
-    party: ThirdParty
-    endpoint: str
-    type: str
-    active: int
-
-
-@strawberry.type
-class ThirdPartyAccount(BaseModel):
-    account: Account
-    third_party: ThirdParty
-
-
-@strawberry.type
-class AccessRequest(BaseModel):
-    uuid: str
-    third_party: ThirdParty
-    account: Account
-    document: Document
-    status: str
-    callback_url: str
-    callback_data: Dict[str, str]
 
 
 class DummyRoute(APIRoute):
@@ -122,7 +37,6 @@ class DummyRoute(APIRoute):
 
 app = FastAPI()
 
-
 origins = [
     "http://0.0.0.0:3000",
     "http://0.0.0.0",
@@ -137,19 +51,20 @@ origins = [
 
 # https://github.com/tiangolo/fastapi/issues/1174
 public_routes = {
-    blake3_(HttpMethod.GET.value + "/"),
-    blake3_(HttpMethod.POST.value + "/account"),
-    blake3_(HttpMethod.POST.value + "/account/auth/verify"),
-    blake3_(HttpMethod.POST.value + "/account/login"),
-    blake3_(HttpMethod.POST.value + "/account/mnemonic"),
-    blake3_(HttpMethod.POST.value + "/account/third-party"),
-    blake3_(HttpMethod.POST.value + "/graphql"),
-    blake3_(HttpMethod.POST.value + "/third-party"),
+    blake3_hexdigest(HttpMethod.GET.value + "/"),
+    blake3_hexdigest(HttpMethod.POST.value + "/account"),
+    blake3_hexdigest(HttpMethod.POST.value + "/account/auth/verify"),
+    blake3_hexdigest(HttpMethod.POST.value + "/account/login"),
+    blake3_hexdigest(HttpMethod.POST.value + "/account/login2"),
+    blake3_hexdigest(HttpMethod.POST.value + "/account/mnemonic"),
+    blake3_hexdigest(HttpMethod.POST.value + "/account/third-party"),
+    blake3_hexdigest(HttpMethod.POST.value + "/graphql"),
+    blake3_hexdigest(HttpMethod.POST.value + "/third-party"),
 }
 
 
 def _is_public_route(method: str, path: str) -> bool:
-    return blake3_(method + path) in public_routes
+    return blake3_hexdigest(method + path) in public_routes
 
 
 class JwtMiddlware(BaseHTTPMiddleware):
@@ -171,9 +86,7 @@ class JwtMiddlware(BaseHTTPMiddleware):
 
         payload: str
         try:
-            payload = jwt.decode(
-                token, BitsyConfig.jwt_secret, algorithms=[BitsyConfig.jwt_algo]
-            )
+            payload = jwt.decode(token, BitsyConfig.jwt_secret, algorithms=[BitsyConfig.jwt_algo])
         except Exception as err:
             return JSONResponse(
                 content={"details": "Invalid JWT"},
@@ -185,9 +98,7 @@ class JwtMiddlware(BaseHTTPMiddleware):
             fail_if_not_found=True,
         )
 
-        party = Model.ThirdPartyAccount.get(
-            where={"account_address": to_checksum_address(payload["address"])}
-        )
+        party = Model.ThirdPartyAccount.get(where={"account_address": to_checksum_address(payload["address"])})
         request.state.account = account
         if party:
             request.state.party_account = party
@@ -218,8 +129,27 @@ def route_index():
 @app.post("/third-party")
 async def route_create_third_party(request: Request):
     body = await request.json()
-    party: ThirdParty = create_third_party(body.get("name"))
+    party: ThirdParty = create_third_party(name=body.get("name"))
     return party
+
+
+@app.post("/account/login")
+async def route_login_account(request: Request):
+    body = await request.json()
+    return login_account(password_hash=body["password_hash"])
+
+
+@app.post("/account/login2")
+async def route_login_account(request: Request):
+    body = await request.json()
+    return login_account(password_haash=blake3_hexdigest(body["password"]))
+
+
+@app.post("/account/mnemonic")
+async def route_create_account_using_mnemnonic(request: Request):
+    body = await request.json()
+    account = create_account_using_mnemnonic(mnemonic=body["mnemonic"], password=body["password"])
+    return account
 
 
 @app.post("/account/third-party")
@@ -229,16 +159,15 @@ async def route_create_third_party(request: Request):
     pubkey = body.get("pubkey")
 
     if pubkey:
-        pubkey = recover_pubkey_from_compressed_hex(body["pubkey"])
-        if pubkey.to_checksum_address() != to_checksum_address(body["address"]):
+        pubkey = recover_pubkey_from_compressed_hex(hex=body["pubkey"])
+        if pubkey.to_checksum_address() != to_checksum_address(value=body["address"]):
             raise RequestError(
                 "Address dervied from the public key recovered from this mnemonic, and the address included in this request do not match. '{}' != '{}'".format(
-                    pubkey.to_address(), to_checksum_address(body["address"])
+                    pubkey.to_address(),
+                    to_checksum_address(value=body["address"]),
                 )
             )
-    party: ThirdParty = create_third_party_account(
-        pubkey=pubkey, address=address
-    )
+    party: ThirdParty = create_third_party_account(pubkey=pubkey, address=address)
     return party
 
 
@@ -246,11 +175,16 @@ async def route_create_third_party(request: Request):
 async def route_create_document(request: Request):
     body = await request.json()
     doc: Document = create_document_for_account_id(
-        body["name"],
-        request.state.account.address,
-        encode(body["data"], Encoding.UTF8),
+        name=body["name"],
+        account_address=request.state.account.address,
+        data=encode(body["data"], Encoding.UTF8),
     )
     return doc
+
+
+@app.get("/document")
+async def route_get_document(request: Request, cid: str):
+    return get_document_with_access_requests(cid=cid, account_address=request.state.account.address)
 
 
 @app.post("/access-token")
@@ -258,7 +192,7 @@ async def route_new_access_token_for_third_party(request: Request):
     body = await request.json()
     name = body.get("name")
     token: AccessToken = create_access_token_for_third_party_id(
-        request.state.party_account.party.uuid, name
+        party_id=request.state.party_account.party.uuid, name=name
     )
     return token
 
@@ -274,16 +208,15 @@ async def route_toggle_third_party_token(request: Request):
 
 @app.get("/access-token")
 async def route_get_access_tokens_for_third_party(request: Request):
-    return Model.AccessToken.get_many(
-        where={"third_party_id": request.state.party_account.party.uuid}
-    )
+    return Model.AccessToken.get_many(where={"third_party_id": request.state.party_account.party.uuid})
 
 
 @app.delete("/access-token")
 async def route_delete_third_party_access_token(request: Request):
     body = await request.json()
     return delete_third_party_access_token_id(
-        request.state.party_account.party.uuid, body["uuid"]
+        third_party_id=request.state.party_account.party.uuid,
+        access_token_uuid=body["uuid"],
     )
 
 
@@ -294,26 +227,25 @@ async def route_create_account(request: Request):
     address = body.get("address")
 
     if pubkey:
-        pubkey = recover_pubkey_from_compressed_hex(body["pubkey"])
-        if pubkey.to_checksum_address() != to_checksum_address(body["address"]):
+        pubkey = recover_pubkey_from_compressed_hex(hex=body["pubkey"])
+        if pubkey.to_checksum_address() != to_checksum_address(value=body["address"]):
             raise RequestError(
                 "Address dervied from the public key recovered from this mnemonic, and the address included in this request do not match. '{}' != '{}'".format(
-                    pubkey.to_address(), to_checksum_address(body["address"])
+                    pubkey.to_address(),
+                    to_checksum_address(value=body["address"]),
                 )
             )
-    return create_account(
-        pubkey=pubkey, password_hash=body["password_hash"], address=address
-    )
+    return create_account(pubkey=pubkey, password_hash=body["password_hash"], address=address)
 
 
 @app.post("/account/auth/verify")
 async def route_verify_nonce_signature(request: Request):
     body = await request.json()
     account = verify_nonce_signature(
-        body["nonce"],
-        body["signature"],
-        body["input"],
-        to_checksum_address(body["address"]),
+        nonce=body["nonce"],
+        signature=body["signature"],
+        input=body["input"],
+        address=to_checksum_address(body["address"]),
     )
 
     if not account:
@@ -336,18 +268,18 @@ async def route_grant_perms_on_doc_for_third_party(request: Request):
         perm: Permission
         if doc_id is None:
             perm: Permission = grant_perms_on_new_doc_for_third_party_id(
-                PermissionKey(body["permission_key"]),
-                party_id,
-                body["name"],
-                encode(body["data"], Encoding.UTF8),
-                request.state.account.address,
+                key=PermissionKey(body["permission_key"]),
+                party_id=party_id,
+                name=body["name"],
+                data=encode(body["data"], Encoding.UTF8),
+                account_address=request.state.account.address,
             )
         else:
             perm: Permission = grant_perms_on_existing_doc_for_third_party_id(
-                PermissionKey(body["permission_key"]),
-                party_id,
-                request.state.account.address,
-                body["document_cid"],
+                key=PermissionKey(body["permission_key"]),
+                party_id=party_id,
+                account_address=request.state.account.address,
+                document_cid=body["document_cid"],
             )
         perms.append(perm)
     return perms
@@ -359,10 +291,10 @@ async def route_revoke_perms_on_existing_doc_for_third_party_id(
 ):
     body = await request.json()
     return revoke_perms_on_existing_doc_for_third_party_id(
-        body["party_id"],
-        body["document_cid"],
-        request.state.account.address,
-        PermissionKey[body["permission_key"]],
+        party_id=body["party_id"],
+        document_id=body["document_cid"],
+        account_address=request.state.account.address,
+        key=PermissionKey[body["permission_key"]],
     )
 
 
@@ -375,9 +307,9 @@ async def route_third_party_access_document_id(request: Request):
     document_cid = body["document_cid"]
 
     document = third_party_access_document_id(
-        third_party_id,
-        document_cid,
-        request.state.account.address,
+        third_party_id=third_party_id,
+        document_cid=document_cid,
+        account_address=request.state.account.address,
     )
 
     return document
@@ -385,10 +317,10 @@ async def route_third_party_access_document_id(request: Request):
 
 @app.get("/account-stats")
 async def route_get_stats_for_account_id(request: Request):
-    return get_stats_for_account_id(request.state.account.address)
+    return get_stats_for_account_id(account_address=request.state.account.address)
 
 
-@app.get("/setting")
+@app.get("/account/setting")
 async def route_get_settings_for_account(request: Request):
     account_address = (
         request.state.party_account.account.address
@@ -398,7 +330,7 @@ async def route_get_settings_for_account(request: Request):
     return get_settings_for_account(address=account_address)
 
 
-@app.post("/setting")
+@app.post("/account/setting")
 async def route_add_setting_to_account_id(request: Request):
     body = await request.json()
 
@@ -409,7 +341,7 @@ async def route_add_setting_to_account_id(request: Request):
     )
 
 
-@app.put("/setting")
+@app.put("/account/setting")
 async def route_toggle_account_setting_id(request: Request):
     body = await request.json()
 
@@ -434,9 +366,7 @@ async def route_create_third_party_webhook_id(request: Request):
 
 @app.get("/webhook")
 async def route_get_webhooks_for_third_party(request: Request):
-    return Model.Webhook.get_many(
-        where={"third_party_id": request.state.party_account.party.uuid}
-    )
+    return Model.Webhook.get_many(where={"third_party_id": request.state.party_account.party.uuid})
 
 
 @app.put("/webhook")
@@ -451,20 +381,18 @@ async def route_toggle_third_party_webhook(request: Request):
 @app.delete("/webhook")
 async def route_delete_third_party_webhook_id(request: Request):
     body = await request.json()
-    return delete_third_party_webhook(
-        request.state.party_account.party.uuid, body["uuid"]
-    )
+    return delete_third_party_webhook(third_party_id=request.state.party_account.party.uuid, webhook_id=body["uuid"])
 
 
 @app.post("/access-request")
 async def route_create_third_party_access_request_id(request: Request):
     body = await request.json()
     return create_third_party_access_request_id(
-        request.state.party_account.party.uuid,
-        body["account_address"],
-        body["document_cid"],
-        body["callback_url"],
-        body["callback_data"],
+        party_id=request.state.party_account.party.uuid,
+        account_address=body["account_address"],
+        document_cid=body["document_cid"],
+        callback_url=body["callback_url"],
+        callback_data=body["callback_data"],
     )
 
 
@@ -472,9 +400,7 @@ async def route_create_third_party_access_request_id(request: Request):
 async def route_create_third_party_access_request_id(request: Request):
     from ._models import AccessRequest
 
-    request = AccessRequest.get_many(
-        where={"account_address": request.state.account.address}
-    )
+    request = AccessRequest.get_many(where={"account_address": request.state.account.address})
     return request
 
 
@@ -491,8 +417,10 @@ router = APIRouter(route_class=DummyRoute)
 
 app.include_router(router)
 app.add_middleware(JwtMiddlware)
+
 if not is_pytest_session():
     app.add_middleware(CatchAllMiddleware)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,

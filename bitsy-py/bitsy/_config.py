@@ -23,13 +23,9 @@ class LogLevel(enum.Enum):
 
 
 def derive_jwt(params: Dict[str, str]):
-    expiry = dt.datetime.now() + dt.timedelta(
-        days=int(BitsyConfig.jwt_expiry_days)
-    )
+    expiry = dt.datetime.now() + dt.timedelta(days=int(BitsyConfig.jwt_expiry_days))
     params["exp"] = int(expiry.strftime("%s"))
-    return jwt.encode(
-        params, BitsyConfig.jwt_secret, algorithm=BitsyConfig.jwt_algo
-    )
+    return jwt.encode(params, BitsyConfig.jwt_secret, algorithm=BitsyConfig.jwt_algo)
 
 
 class Defaults:
@@ -66,9 +62,7 @@ class BitsyConfig:
     pg_user: str = Defaults.pg_user
     vault_address: str = Defaults.vault_address
     workers: int = Defaults.workers
-    connection = create_postgres_conn(
-        pg_database, pg_user, pg_password, pg_host, pg_port
-    )
+    connection = create_postgres_conn(pg_database, pg_user, pg_password, pg_host, pg_port)
 
     def __init__(self, **kwargs):
         self.__dict__.update(kwargs)
@@ -103,9 +97,7 @@ class BitsyConfig:
         )
 
     def to_json(self) -> str:
-        object = dict(
-            [(k, v) for k, v in self.__dict__.items() if k != "connection"]
-        )
+        object = dict([(k, v) for k, v in self.__dict__.items() if k != "connection"])
         return json.dumps(object)
 
     @staticmethod

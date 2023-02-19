@@ -37,7 +37,7 @@ class TestWeb(BaseTestClass):
             json={
                 "pubkey": RealMetamaskAcct.compressed_pubkey,
                 "address": RealMetamaskAcct.address0,
-                "password_hash": blake3_("mypassword"),
+                "password_hash": blake3_hexdigest("mypassword"),
             },
         )
         rjson = response.json()
@@ -48,9 +48,9 @@ class TestWeb(BaseTestClass):
             (rjson["address"], rjson["password_hash"], rjson["pubkey"], rjson["created_at"], None)
         )
         assert response.status_code == status.HTTP_200_OK
-        assert account.pubkey == blake3_(recovered_pubkey.to_hex())
+        assert account.pubkey == blake3_hexdigest(recovered_pubkey.to_hex())
         assert account.address == rjson["address"]
-        assert account.password_hash == blake3_("mypassword")
+        assert account.password_hash == blake3_hexdigest("mypassword")
         assert isinstance(account.created_at, int)
 
     def test_route_create_document(self, test_account):
@@ -159,7 +159,7 @@ class TestWeb(BaseTestClass):
     def test_route_add_setting_to_account_id(self, test_account):
         account = test_account
         response = self.client.post(
-            "/setting",
+            "/account/setting",
             json={
                 "key": SettingKey.Other.value,
                 "value": 1,
@@ -184,13 +184,14 @@ class TestWeb(BaseTestClass):
         setting = add_setting_to_account(account, SettingKey.Other, 1)
         assert setting.enabled()
         response = self.client.put(
-            "/setting",
+            "/account/setting",
             json={
                 "key": SettingKey.Other.value,
             },
             headers={"Authorization": account.jwt},
         )
         rjson = response.json()
+        print(">> JSON ", rjson)
         setting = Setting.from_row(
             (
                 rjson["account"]["address"],
@@ -233,9 +234,7 @@ class TestWeb(BaseTestClass):
         account = test_account
         party = create_third_party()
         document = create_document_for_account("another doc", xml_doc, account)
-        perm = grant_perms_on_existing_doc_for_third_party(
-            PermissionKey.Read, party, account, document
-        )
+        perm = grant_perms_on_existing_doc_for_third_party(PermissionKey.Read, party, account, document)
 
         _ = self.client.delete(
             "/permission",
@@ -269,9 +268,7 @@ class TestWeb(BaseTestClass):
 
     def test_route_delete_third_party_webhook_id(self, test_party_account):
         party_acct = test_party_account
-        webhook = create_third_party_webhook(
-            party_acct.party, "/foo", WebhookType.Incoming, "foo", 0
-        )
+        webhook = create_third_party_webhook(party_acct.party, "/foo", WebhookType.Incoming, "foo", 0)
 
         assert isinstance(webhook, Webhook)
 
@@ -285,9 +282,7 @@ class TestWeb(BaseTestClass):
         result = self.get_from_db(f"SELECT * FROM webhooks WHERE uuid = '{webhook.uuid}'")
         assert not result
 
-    def test_route_create_third_party_access_request_id(
-        self, xml_doc, test_account, test_party_account
-    ):
+    def test_route_create_third_party_access_request_id(self, xml_doc, test_account, test_party_account):
         from .conftest import keypair_func
 
         party_acct = test_party_account

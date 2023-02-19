@@ -1,13 +1,17 @@
 import React from 'react';
 import {View, SafeAreaView, StatusBar, Text, Image, TouchableOpacity} from 'react-native';
 import {Button, TextInput, Switch} from 'react-native-paper';
-import {NavigationProps} from './../global';
+import {httpRequest} from '../utils';
+import {NavigationProps, ActionState, ErrorMessage, Option} from './../global';
+import Session from '../services/Session';
 
 interface SignupViewState {
   mnemonic: string;
   password: string;
   confirmedPassword: string;
   unlockWithFaceId: boolean;
+  actionState: ActionState;
+  error: Option<ErrorMessage>;
 }
 
 interface SignupViewProps extends NavigationProps {}
@@ -20,8 +24,48 @@ class SignupView extends React.Component<SignupViewProps, SignupViewState> {
       password: '',
       confirmedPassword: '',
       unlockWithFaceId: false,
+      error: null,
+      actionState: ActionState.none,
     };
   }
+
+  validateForm = () => {
+    if (this.state.password === this.state.confirmedPassword) {
+      return true;
+    }
+
+    this.setState({actionState: ActionState.error, error: 'Invalid form'});
+  };
+
+  importMnemonic = async () => {
+    this.setState({actionState: ActionState.pending});
+
+    const {data, error} = await httpRequest({
+      url: '/account/mnemonic',
+      method: 'POST',
+      data: {
+        mnemonic: this.state.mnemonic,
+        password: this.state.password,
+      },
+    });
+
+    if (error) {
+      this.setState({actionState: ActionState.error, error});
+      return;
+    }
+
+    this.setState({actionState: ActionState.success}, () => {
+      Session.save(data, () => {
+        this.props.navigation.navigate('Tabs', {account: data});
+      });
+    });
+  };
+
+  renderErrorHeader = () => {
+    if (this.state.actionState === ActionState.error) {
+      // TODO: finish
+    }
+  };
 
   render() {
     return (
@@ -190,7 +234,7 @@ class SignupView extends React.Component<SignupViewProps, SignupViewState> {
               <Button
                 mode="outlined"
                 style={{borderRadius: 10, width: '90%', height: 40}}
-                onPress={() => this.props.navigation.navigate('Tabs')}
+                onPress={async () => await this.importMnemonic()}
               >
                 IMPORT
               </Button>

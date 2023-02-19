@@ -22,4 +22,10 @@ export default class Setting {
   description(): string {
     return _SettingsMetadata[this.key].description;
   }
+
+  static fromObject(data: any) {
+    const {key, value, account} = data;
+    const acct = Account.fromObject(account);
+    return new Setting(key, value, acct);
+  }
 }

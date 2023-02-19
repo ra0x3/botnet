@@ -57,14 +57,14 @@ def eth_acct() -> eth_account.Account:
 @pytest.fixture
 def test_account() -> Model.Account:
     keypair = keypair_func()
-    password_hash = blake3_(rand_string())
+    password_hash = blake3_hexdigest(rand_string())
     return create_account(pubkey=keypair.pubkey, password_hash=password_hash)
 
 
 @pytest.fixture
 def test_party_account() -> Model.Account:
     keypair = keypair_func()
-    password_hash = blake3_(rand_string())
+    password_hash = blake3_hexdigest(rand_string())
     return create_third_party_account(pubkey=keypair.pubkey, password_hash=password_hash)
 
 

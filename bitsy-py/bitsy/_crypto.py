@@ -24,7 +24,7 @@ class PrivateKey(eth_keys.keys.PrivateKey):
 
 # FIXME: Obviously this is a no-no
 def key_image(key: Union[str, bytes]) -> str:
-    return blake3_(key)
+    return blake3_hexdigest(key)
 
 
 def salt(n: int = 16) -> bytes:
@@ -46,9 +46,7 @@ def fernet_bundle(key_bytes: Optional[bytes] = None) -> FernetBundle:
     return FernetBundle(key_bytes, key_img, hexkey)
 
 
-kdf = PBKDF2HMAC(
-    algorithm=hashes.SHA256(), length=32, salt=salt(), iterations=390000
-)
+kdf = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt(), iterations=390000)
 
 
 def pbkdf2hmac_kdf(key: bytes) -> bytes:
@@ -81,15 +79,23 @@ class Keypair:
         self.address = self.pubkey.to_checksum_address()
 
 
-def eth_account_from_mnemonic(m: str) -> eth_account.Account:
+def eth_account_from_mnemonic(m: str, password: Optional[str] = None) -> eth_account.Account:
     # https://www.reddit.com/r/seedstorage/comments/voixjj/comment/iedodmv/?utm_source=share&utm_medium=web2x&context=3
-    return web3.eth.account.from_mnemonic(m, account_path="m/44'/60'/0'/0/0")
+    if password:
+        return web3.eth.account.from_mnemonic(mnemonic=m, account_path="m/44'/60'/0'/0/0", passphrase=password)
+    return web3.eth.account.from_mnemonic(mnemonic=m, account_path="m/44'/60'/0'/0/0")
 
 
-def mnemonic_to_pubkey(m: str) -> Tuple[str, PublicKey]:
-    acct = eth_account_from_mnemonic(m)
+def mnemonic_to_pubkey(m: str, password: Optional[str] = None) -> PublicKey:
+    acct = eth_account_from_mnemonic(m, password)
     privkey = eth_keys.keys.PrivateKey(acct._private_key)
     return privkey.public_key
+
+
+def keypair_func() -> Keypair:
+    acct = web3.eth.account.create()
+    privkey = eth_keys.keys.PrivateKey(acct._private_key)
+    return Keypair(privkey, privkey.public_key)
 
 
 class BaseKey:
@@ -160,9 +166,7 @@ class InMemoryConnection(BaseConnection):
 
 class VaultConnection(BaseConnection):
     def _init(self):
-        self._store = hvac.Client(
-            url=self.config.vault_address, token=env_var("VAULT_ROOT_TOKEN")
-        )
+        self._store = hvac.Client(url=self.config.vault_address, token=env_var("VAULT_ROOT_TOKEN"))
 
     def get_key(self, id: str) -> PublicKey:
         response = self._store.secrets.kv.v2.read_secret(id)
@@ -171,9 +175,7 @@ class VaultConnection(BaseConnection):
     def put_key(self, key: PublicKey):
         hexkey = key.to_hex()
         key_img = key_image(hexkey)
-        self._store.secrets.kv.v2.create_or_update_secret(
-            key_img, secret={"key": hexkey}
-        )
+        self._store.secrets.kv.v2.create_or_update_secret(key_img, secret={"key": hexkey})
 
     def get_hex(self, id: str) -> str:
         response = self._store.secrets.kv.v2.read_secret(id)
@@ -181,9 +183,7 @@ class VaultConnection(BaseConnection):
 
     def put_hex(self, key: str):
         key_img = key_image(key)
-        self._store.secrets.kv.v2.create_or_update_secret(
-            key_img, secret={"key": decode(key, Encoding.UTF8)}
-        )
+        self._store.secrets.kv.v2.create_or_update_secret(key_img, secret={"key": decode(key, Encoding.UTF8)})
 
 
 _Connection = TypeVar(
