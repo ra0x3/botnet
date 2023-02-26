@@ -1,5 +1,6 @@
 extern crate proc_macro;
 
+use bitsy_utils::type_id;
 use proc_macro::TokenStream;
 use proc_macro_error::proc_macro_error;
 use quote::{format_ident, quote};
@@ -16,7 +17,7 @@ fn process_task(attrs: TokenStream, input: TokenStream) -> TokenStream {
         #[async_trait::async_trait]
         impl<K, D> Task<K, D> for #ident
         where
-            K: Key + std::cmp::Eq + std::hash::Hash + Send + Sync,
+            K: DatabaseKey,
             D: Database + Send + Sync + 'static
         {
             type Database = D;
@@ -31,31 +32,34 @@ fn process_task(attrs: TokenStream, input: TokenStream) -> TokenStream {
 fn process_key(input: TokenStream) -> TokenStream {
     let item = parse_macro_input!(input as ItemStruct);
     let ident = &item.ident;
+    let name = ident.to_string();
+    // let name = &ident_s[..ident_s.len() - 3];
+    let ty_id = type_id(&*name);
 
     let output = quote! {
 
-        #[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Clone)]
+        #[derive(Debug, PartialEq, Eq, Hash, Clone)]
         #item
 
-        impl FoobarZoo for #ident {}
+        impl DatabaseKey for #ident {}
 
         impl Key for #ident {
 
+            const NAME: &'static str = #name;
+            const TYPE_ID: usize = #ty_id;
+
             type Item = Field;
             type Metadata = KeyMetadata;
-            type TypeId = usize;
-            type Type = KeyType;
 
-            fn new(name: &str) -> Self {
+            fn builder() -> Self {
                 Self {
                     fields: Vec::new(),
                     metadata: KeyMetadata::default(),
-                    type_id: type_id(name),
                 }
             }
 
             fn metadata(&mut self, meta: KeyMetadata) -> &mut Self {
-                self.metadata = KeyMetadata::with_key_code(meta, self.type_id);
+                self.metadata = KeyMetadata::with_key_code(meta, Self::TYPE_ID);
                 self
             }
 
@@ -79,7 +83,7 @@ fn process_key(input: TokenStream) -> TokenStream {
                         .collect::<Vec<u8>>(),
                 );
 
-                let id = Bytes::from(usize::to_le_bytes(self.type_id).to_vec());
+                let id = Bytes::from(usize::to_le_bytes(Self::TYPE_ID).to_vec());
                 Bytes::from([id, fields].concat())
                 // Bytes::new()
             }
@@ -88,47 +92,43 @@ fn process_key(input: TokenStream) -> TokenStream {
                 self.metadata.clone()
             }
 
-            fn type_id(&self) -> Self::TypeId {
-                self.type_id
+            fn type_id(&self) -> usize {
+                Self::TYPE_ID
+            }
+
+            fn name(&self) -> &'static str {
+                Self::NAME
             }
         }
 
         impl AsBytes for #ident {
             fn as_bytes(&self) -> &[u8] {
-                <HttpKey as AsBytes>::as_bytes(self)
+                <#ident as AsBytes>::as_bytes(self)
             }
         }
 
         impl #ident {
-            pub fn from_input(key_name: &str, value: Input, extractors: Extractors) -> BitsyResult<Self> {
-                let key = #ident::new(key_name);
-
-                let ty_id = type_id(key_name);
+            pub fn from_input(value: Input, extractors: &Extractors, metadata: &Metadata) -> BitsyResult<Self> {
+                let meta = metadata.get(&Self::TYPE_ID);
                 let fields = extractors.items.iter().map(|e| e.1.call(&value).expect("Failed to call on input.")).collect::<Vec<Field>>();
 
-                Ok(#ident::from_fields(key_name, fields))
+                // TODO: use builder pattern
+                Ok(#ident{ fields, metadata: meta.to_owned() })
             }
 
-            pub fn from_fields(key_name: &str, fields: Vec<Field>) -> Self {
-                #ident{ fields, metadata: KeyMetadata::default(), type_id: type_id(key_name) }
-            }
-        }
-
-
-        impl From<Bytes> for #ident {
-            fn from(b: Bytes) -> #ident {
+            pub fn from_bytes(b: Bytes, metadata: &Metadata) -> BitsyResult<#ident> {
                 let mut parts = b.chunks_exact(64);
 
                 let key_ty_id = parts.next().unwrap();
-                let key_name = std::str::from_utf8(&key_ty_id).expect("Bad key.");
+                let meta = metadata.get(&Self::TYPE_ID);
 
                 // let ty_id = usize::from_le_bytes(parts[0]);
 
-                let key = #ident::new(&key_name);
-
-                key
+                Ok(#ident::builder())
             }
         }
+
+
     };
 
     TokenStream::from(output)

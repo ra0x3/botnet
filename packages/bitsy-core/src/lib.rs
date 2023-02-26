@@ -2,8 +2,9 @@ pub mod database;
 pub mod task;
 pub mod utils;
 
-pub use crate::database::{Database, FoobarZoo};
+pub use crate::database::{Database, DatabaseKey};
 pub use async_std::sync::{Arc, Mutex};
+pub use bitsy_utils::type_id;
 pub use bytes::Bytes;
 pub use nom::AsBytes;
 use serde::{Deserialize, Serialize};
@@ -14,8 +15,8 @@ use std::{
 };
 use thiserror::Error;
 pub use url::Url;
-use utils::{fn_name, type_id};
 
+// pub type Extractor = fn(&Input) -> BitsyResult<Field>;
 pub struct Input(pub Bytes);
 
 impl Input {
@@ -24,14 +25,13 @@ impl Input {
     }
 }
 
-pub type BitsyResult<T> = Result<T, AnomalyDetectorError>;
+pub type BitsyResult<T> = Result<T, BitsyError>;
 
 pub mod prelude {
     pub use super::{
-        task::Task,
-        utils::{type_id, values_to_bytes},
-        Arc, AsBytes, BitsyResult, Bytes, Database, Extractor, Extractors, Field,
-        FieldMeta, FieldType, FoobarZoo, Input, Key, KeyType, Mutex, Url, Value,
+        task::Task, type_id, utils::values_to_bytes, Arc, AsBytes, BitsyResult, Bytes,
+        Database, DatabaseKey, Extractor, Extractors, Field, FieldMetadata, FieldType,
+        Input, Key, KeyType, Metadata, Mutex, Url, Value,
     };
 }
 
@@ -73,7 +73,7 @@ impl AsValue for &'static str {
 }
 
 #[derive(Debug, Error)]
-pub enum AnomalyDetectorError {
+pub enum BitsyError {
     #[error("ParseError: {0:#?}")]
     ParseError(#[from] url::ParseError),
     #[error("BincodeError: {0:#?}")]
@@ -128,7 +128,7 @@ pub enum FieldType {
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone, Eq, PartialEq, Hash)]
-pub struct FieldMeta {
+pub struct FieldMetadata {
     name: String,
     key: String,
     value_map: ValueMap,
@@ -136,13 +136,13 @@ pub struct FieldMeta {
     description: String,
 }
 
-impl FieldMeta {
+impl FieldMetadata {
     pub fn new(name: &str, key: &str, values: Vec<Bytes>, description: &str) -> Self {
         Self {
             name: name.to_string(),
             key: key.to_string(),
             value_map: ValueMap::from_values(values),
-            type_id: utils::type_id(key),
+            type_id: type_id(key),
             description: description.to_string(),
         }
     }
@@ -150,7 +150,7 @@ impl FieldMeta {
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone, Eq)]
 pub struct KeyMetadata {
-    field_meta: HashMap<String, FieldMeta>,
+    field_meta: HashMap<String, FieldMetadata>,
     type_id: usize,
 }
 
@@ -182,7 +182,7 @@ impl KeyMetadata {
         Ok(Bytes::from(bincode::serialize(&self)?))
     }
 
-    pub fn field(&mut self, f: FieldMeta) -> &mut Self {
+    pub fn field(&mut self, f: FieldMetadata) -> &mut Self {
         self.field_meta.insert(f.name.clone(), f);
         self
     }
@@ -201,17 +201,15 @@ impl KeyMetadata {
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone, Eq, PartialEq, Hash)]
 pub struct Field {
-    pub key_name: String,
     pub type_id: usize,
     pub field_name: String,
     pub value: Bytes,
 }
 
 impl Field {
-    pub fn new(key_name: &str, field_name: &str, value: Bytes) -> Self {
+    pub fn new(field_name: &str, value: Bytes) -> Self {
         Self {
-            key_name: key_name.to_string(),
-            type_id: type_id(key_name),
+            type_id: type_id(field_name),
             field_name: field_name.to_string(),
             value,
         }
@@ -219,22 +217,39 @@ impl Field {
 }
 
 pub trait Key {
+    const NAME: &'static str;
+    const TYPE_ID: usize;
+
     type Item;
     type Metadata;
-    type TypeId;
-    type Type;
 
     fn build(&self) -> Self;
     fn field(&mut self, f: Self::Item) -> &mut Self;
     fn flatten(&self) -> Bytes;
     fn get_metadata(&self) -> Self::Metadata;
     fn metadata(&mut self, meta: KeyMetadata) -> &mut Self;
-    fn new(name: &str) -> Self;
-    fn type_id(&self) -> Self::TypeId;
+    fn builder() -> Self;
+    fn type_id(&self) -> usize;
+    fn name(&self) -> &'static str;
 }
+
 pub struct Extractor {
+    #[allow(unused)]
     key: String,
     func: fn(&Input) -> BitsyResult<Field>,
+}
+
+impl Default for Extractor {
+    fn default() -> Self {
+        fn default_func(_input: &Input) -> BitsyResult<Field> {
+            Ok(Field::default())
+        }
+
+        Self {
+            key: String::default(),
+            func: default_func,
+        }
+    }
 }
 
 impl Extractor {
@@ -250,6 +265,7 @@ impl Extractor {
     }
 }
 
+#[derive(Default)]
 pub struct Extractors {
     pub items: HashMap<String, Extractor>,
 }
@@ -264,5 +280,26 @@ impl Extractors {
     pub fn add(&mut self, key: &str, value: fn(&Input) -> BitsyResult<Field>) {
         self.items
             .insert(key.to_string(), Extractor::new(key, value));
+    }
+}
+
+#[derive(Default)]
+pub struct Metadata {
+    items: HashMap<usize, KeyMetadata>,
+}
+
+impl Metadata {
+    pub fn new() -> Self {
+        Self {
+            items: HashMap::default(),
+        }
+    }
+
+    pub fn insert(&mut self, ty_id: usize, meta: KeyMetadata) {
+        self.items.insert(ty_id, meta);
+    }
+
+    pub fn get(&self, ty_id: &usize) -> &KeyMetadata {
+        self.items.get(ty_id).unwrap()
     }
 }
