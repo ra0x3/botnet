@@ -11,8 +11,10 @@ env:
   DASEL_VERSION: https://github.com/TomWright/dasel/releases/download/v1.24.3/dasel_linux_amd64
   CARGO_TERM_COLOR: always
   RUSTFLAGS: -D warnings
+  RUSTC_VERSION: 1.67
   REGISTRY: ghcr.io
-  BRANCH_NAME: ${{ github.head_ref || github.ref_name }} 
+  BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
+  IS_RELEASE: github.event_name == 'release' && github.event.action == 'published'
 
 jobs:
   cancel-previous-runs:
@@ -23,9 +25,24 @@ jobs:
         with:
           access_token: ${{ github.token }}
 
-  cargo-toml-fmt-check:
+  check-rustc:
     needs:
       - cancel-previous-runs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check rustc version
+        run: |
+          # Check rustc version, log message and exit if it doesnt match env 
+          CURRENT_RUSTC_VERSION=$(rustc --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | cut -c -4)
+          if [ "$CURRENT_RUSTC_VERSION" != "$RUSTC_VERSION" ]; then
+            echo "Rustc version ($CURRENT_RUSTC_VERSION) does not match the required version ($RUSTC_VERSION)"
+            exit 1 
+          fi
+          echo "Rustc version ($CURRENT_RUSTC_VERSION) matches the required version ($RUSTC_VERSION)"
+
+  cargo-toml-fmt-check:
+    needs:
+      - check-rustc
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -58,24 +75,79 @@ jobs:
           members=$(cat Cargo.toml | dasel -r toml -w json 'workspace.members' | jq -r ".[]" | xargs -I '{}' dasel -f {}/Cargo.toml 'package.name' | jq -R '[.]' | jq -s -c 'add')
           echo "members=$members" >> $GITHUB_OUTPUT
 
+  cargo-unused-deps-check:
+    needs:
+      - cancel-previous-runs
+      - cargo-toml-fmt-check
+      - check-rustc
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:latest
+        env:
+          POSTGRES_PASSWORD: my-secret
+          POSTGRES_DB: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          # `cargo-udeps` requires nightly to run
+          toolchain: nightly
+          default: true
+      - uses: Swatinem/rust-cache@v1
+      - name: Install cargo-udeps
+        uses: actions-rs/cargo@v1
+        with:
+          command: install
+          args: cargo-udeps
+      - name: Check Unused Deps
+        uses: actions-rs/cargo@v1
+        with:
+          command: udeps
+          args: --all-targets --all-features  # TODO: add --locked
+
+  cargo-clippy:
+    needs:
+      - cargo-toml-fmt-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+      - name: cargo clippy --all-targets --all-features
+        run: cargo clippy --all-targets --all-features
+
+  cargo-fmt:
+    needs:
+      - cargo-toml-fmt-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+      - name: cargo fmt --all --verbose -- --check
+        run: cargo fmt --all --verbose -- --check
+
   cargo-verifications:
     runs-on: ubuntu-latest
     needs:
-      - cancel-previous-runs
       - get-workspace-members
-    if: github.event_name != 'release' && github.event.action != 'published'
+      - cargo-clippy
+      - cargo-fmt
     strategy:
       matrix:
         package: ${{ fromJSON(needs.get-workspace-members.outputs.members) }}
         include:
-          - command: fmt
-            args: --all --verbose -- --check
-          - command: clippy
-            args: --all-features --all-targets
-          - command: check
-            args: --all-features --locked --workspace --all-targets
           - command: build
-            args: --locked --workspace --all-features --all-targets
+            args: --workspace --all-features --all-targets  # TODO: add --locked
 
     # disallow any job that takes longer than 45 minutes
     timeout-minutes: 45
@@ -87,15 +159,45 @@ jobs:
           profile: minimal
           toolchain: stable
 
-      - name: ${{ matrix.command }} ${{ matrix.args }}
+      - name: cargo ${{ matrix.command }} -p ${{ matrix.package }} ${{ matrix.args }}
         uses: actions-rs/cargo@v1
         with:
           command: ${{ matrix.command }}
           args: ${{ matrix.args }}
 
-      - name: Notify if Job Fails
+  publish:
+    # Only do this job if publishing a release and validations pass.
+    needs:
+      - cargo-verifications
+    if: github.event_name == 'release' && github.event.action == 'published'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Install toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - name: Verify tag version
+        run: |
+          curl -sSLf "${DASEL_VERSION}" -L -o dasel && chmod +x dasel
+          mv ./dasel /usr/local/bin/dasel
+          ./.github/workflows/scripts/verify_tag.sh ${{ github.ref_name }} packages/bitsy/Cargo.toml
+          ./.github/workflows/scripts/verify_tag.sh ${{ github.ref_name }} packages/bitsy-core/Cargo.toml
+          ./.github/workflows/scripts/verify_tag.sh ${{ github.ref_name }} packages/bitsy-macros/Cargo.toml
+          ./.github/workflows/scripts/verify_tag.sh ${{ github.ref_name }} packages/bitsy-utils/Cargo.toml
+
+      - name: Publish crates
+        uses: katyo/publish-crates@v1
+        with:
+          publish-delay: 30000
+          registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      - name: Notify Slack On Failure
         uses: ravsamhq/notify-slack-action@v2
-        if: always() && github.ref == 'refs/heads/master'
+        if: always()
         with:
           status: ${{ job.status }}
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -105,4 +207,3 @@ jobs:
           notify_when: 'failure'
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_NOTIFY_BUILD }}
-          RUSTFLAGS: -D warnings

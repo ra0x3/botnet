@@ -1,5 +1,5 @@
 [package]
-name = "bitsy-macros"
+name = "bitsy-utils"
 version = "0.1.0"
 edition = "2021"
 license = "BUSL-1.1"
@@ -8,12 +8,5 @@ description = "bitsy"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[lib]
-proc-macro = true
-
 [dependencies]
-bitsy-utils = { path = "./../bitsy-utils", version = "0.1" }
-proc-macro-error = "1.0"
-proc-macro2 = "1.0"
-quote = "1"
-syn = { version = "1.0", features = ["full"] }
+nom = "5.1"

@@ -1,19 +1,19 @@
-use crate::{AsBytes, BitsyResult, Bytes, Key, KeyMetadata};
-use async_std::sync::{Arc, Mutex, RwLock};
+use crate::{AsBytes, BitsyResult, Bytes, Key};
+use async_std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use std::collections::HashMap;
 
-pub trait FoobarZoo:
+pub trait DatabaseKey:
     Key + AsBytes + std::cmp::Eq + std::hash::Hash + Send + Sync
 {
 }
 
 #[async_trait]
 pub trait Database {
-    async fn set_key<K: FoobarZoo>(&mut self, k: K, v: Bytes) -> BitsyResult<()>;
-    async fn get_key<K: FoobarZoo>(&self, k: K) -> BitsyResult<Option<K>>;
+    async fn set_key(&mut self, k: impl DatabaseKey, v: Bytes) -> BitsyResult<()>;
+    async fn get_key(&self, k: impl DatabaseKey) -> BitsyResult<Option<Bytes>>;
     async fn set_bytes(&self, b: Bytes, v: Bytes) -> BitsyResult<()>;
-    async fn get_bytes(&self, k: Bytes) -> BitsyResult<Option<Bytes>>;
+    async fn get_bytes(&self, k: &Bytes) -> BitsyResult<Option<Bytes>>;
 }
 
 enum DbType {
@@ -43,60 +43,23 @@ impl Default for InMemory {
     }
 }
 
-/**
- *
- * Cache needs to store bytes as keys and bytes as values
- *
- * bytes for storing key metadata
- *
- * and bytes for storing the literal flattened key
- *
- */
-
 #[async_trait]
 impl Database for InMemory {
-    async fn set_key<K: FoobarZoo>(&mut self, k: K, v: Bytes) -> BitsyResult<()> {
-        let k = Bytes::from(k.as_bytes().to_owned());
+    async fn set_key(&mut self, k: impl DatabaseKey, v: Bytes) -> BitsyResult<()> {
+        self.items.lock().await.insert(k.flatten(), v);
+        Ok(())
+    }
+
+    async fn get_key(&self, k: impl DatabaseKey) -> BitsyResult<Option<Bytes>> {
+        Ok(self.items.lock().await.remove(&k.flatten()))
+    }
+
+    async fn set_bytes(&self, k: Bytes, v: Bytes) -> BitsyResult<()> {
         self.items.lock().await.insert(k, v);
         Ok(())
     }
 
-    async fn get_key<K: FoobarZoo>(&self, k: K) -> BitsyResult<Option<K>> {
-        Ok(None)
+    async fn get_bytes(&self, k: &Bytes) -> BitsyResult<Option<Bytes>> {
+        Ok(self.items.lock().await.remove(k))
     }
-
-    async fn set_bytes(&self, b: Bytes, v: Bytes) -> BitsyResult<()> {
-        Ok(())
-    }
-
-    async fn get_bytes(&self, k: Bytes) -> BitsyResult<Option<Bytes>> {
-        Ok(None)
-    }
-
-    // async fn get(&self, k: Bytes) -> BitsyResult<Option<Bytes>> {
-    //     Ok(self.items.lock().await.remove(&k))
-    // }
-
-    // // TODO: both types of K (Decompress, Compress) require different K types/sized
-
-    // async fn set_metadata< K: FoobarZoo>(&self, k: K) -> BitsyResult<()> {
-    //     let key_meta = k.get_metadata();
-    //     let ty_id = usize::to_le_bytes(key_meta.type_id).to_vec();
-    //     let bytes = vec![
-    //         Bytes::from(ty_id),
-    //         key_meta.as_bytes()?,
-    //     ]
-    //     .concat();
-    //     self.items
-    //         .lock()
-    //         .await
-    //         .insert(k, Bytes::from(bytes));
-    //     Ok(())
-    // }
-
-    // async fn get_metadata(&self, k: K) -> BitsyResult<()> {
-    //     let bytes = self.items.lock().await.get(&k).to_owned().unwrap();
-    //     let key_ty_id = &bytes[..64];
-    //     Ok(())
-    // }
 }

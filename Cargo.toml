@@ -1,6 +1,8 @@
 [workspace]
 resolver = "2"
 members = [
+    "packages/bitsy", 
     "packages/bitsy-core", 
-    "packages/bitsy-macros"
+    "packages/bitsy-macros",
+    "packages/bitsy-utils"
 ]
