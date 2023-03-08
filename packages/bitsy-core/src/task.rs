@@ -8,8 +8,5 @@ where
     K: DatabaseKey,
     D: Database + Send + Sync,
 {
-    type Database;
-
-    async fn run(k: &'static K, db: Option<Self::Database>)
-        -> BitsyResult<Option<Value>>;
+    async fn run(k: K, db: Option<D>) -> BitsyResult<Option<Value>>;
 }

@@ -8,6 +8,10 @@ description = "bitsy"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[[bin]]
+name = "bitsy"
+path = "src/bin/main.rs"
+
 [dependencies]
 async-std = "1.0"
 async-trait = "0.1"

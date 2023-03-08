@@ -1,5 +1,5 @@
 use bitsy_core::{database::InMemory, prelude::*, KeyMetadata};
-use bitsy_macros::key;
+use bitsy_macros::{key, task};
 use std::collections::HashMap;
 
 fn extract_ssl_param(input: &Input) -> BitsyResult<Field> {
@@ -16,14 +16,10 @@ struct HttpProto {
     metadata: KeyMetadata,
 }
 
-// #[task(Counter)]
-// async fn run(k: &'static impl , db: Option<Self::Database>) -> BitsyResult<Option<Value>> {
-//     if let Some(db) = db {
-//         db.set_key(k, Bytes::new()).await?;
-//     }
-
-//     Ok(None)
-// }
+#[task(Counter)]
+async fn run(k: K, db: Option<D>) -> BitsyResult<Option<Value>> {
+    Ok(None)
+}
 
 #[tokio::main]
 async fn main() -> BitsyResult<()> {
@@ -66,7 +62,10 @@ async fn main() -> BitsyResult<()> {
     let input: Input = "http://google.com?foo=true&ssl=zoo&z=shoo&shoo=baz&baz=123&user_agent=ua1&mkt=US".into();
     let key = HttpProto::from_input(input, &extractors, &metadata)?;
 
-    db.set_key(key, Bytes::new()).await?;
+    db.set_key(key.clone(), Bytes::new()).await?;
+
+    // run tasks
+    let _ = CounterTask::run(key, Some(db)).await?;
 
     Ok(())
 }

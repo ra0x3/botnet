@@ -17,10 +17,10 @@ fn process_task(attrs: TokenStream, input: TokenStream) -> TokenStream {
         #[async_trait::async_trait]
         impl<K, D> Task<K, D> for #ident
         where
-            K: DatabaseKey,
+            K: DatabaseKey + 'static,
             D: Database + Send + Sync + 'static
         {
-            type Database = D;
+            #[allow(unused)]
             #func
         }
 
@@ -33,7 +33,6 @@ fn process_key(input: TokenStream) -> TokenStream {
     let item = parse_macro_input!(input as ItemStruct);
     let ident = &item.ident;
     let name = ident.to_string();
-    // let name = &ident_s[..ident_s.len() - 3];
     let ty_id = type_id(&*name);
 
     let output = quote! {
