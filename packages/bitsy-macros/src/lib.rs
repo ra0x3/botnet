@@ -29,6 +29,25 @@ fn process_task(attrs: TokenStream, input: TokenStream) -> TokenStream {
     TokenStream::from(output)
 }
 
+fn process_evaluator(attrs: TokenStream, input: TokenStream) -> TokenStream {
+    let func = parse_macro_input!(input as ItemFn);
+    let ident = format_ident!("{}Evaluator", parse_macro_input!(attrs as Ident));
+
+    let output = quote! {
+
+        struct #ident{}
+
+        #[async_trait::async_trait]
+        impl Evaluator for #ident {
+            #[allow(unused)]
+            #func
+        }
+
+    };
+
+    TokenStream::from(output)
+}
+
 fn process_key(input: TokenStream) -> TokenStream {
     let item = parse_macro_input!(input as ItemStruct);
     let ident = &item.ident;
@@ -84,7 +103,6 @@ fn process_key(input: TokenStream) -> TokenStream {
 
                 let id = Bytes::from(usize::to_le_bytes(Self::TYPE_ID).to_vec());
                 Bytes::from([id, fields].concat())
-                // Bytes::new()
             }
 
             fn get_metadata(&self) -> Self::Metadata {
@@ -122,7 +140,7 @@ fn process_key(input: TokenStream) -> TokenStream {
                 let meta = metadata.get(&Self::TYPE_ID);
 
                 // let ty_id = usize::from_le_bytes(parts[0]);
-
+                // TODO: finish
                 Ok(#ident::builder())
             }
         }
@@ -137,6 +155,12 @@ fn process_key(input: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn task(attrs: TokenStream, input: TokenStream) -> TokenStream {
     process_task(attrs, input)
+}
+
+#[proc_macro_error]
+#[proc_macro_attribute]
+pub fn evaluator(attrs: TokenStream, input: TokenStream) -> TokenStream {
+    process_evaluator(attrs, input)
 }
 
 #[proc_macro_error]

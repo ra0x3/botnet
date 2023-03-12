@@ -1,5 +1,5 @@
 use bitsy_core::{database::InMemory, prelude::*, KeyMetadata};
-use bitsy_macros::{key, task};
+use bitsy_macros::{evaluator, key, task};
 use std::collections::HashMap;
 
 fn extract_ssl_param(input: &Input) -> BitsyResult<Field> {
@@ -17,7 +17,12 @@ struct HttpProto {
 }
 
 #[task(Counter)]
-async fn run(k: K, db: Option<D>) -> BitsyResult<Option<Value>> {
+async fn run(k: K, db: Option<D>) -> BitsyResult<Option<SerdeValue>> {
+    Ok(None)
+}
+
+#[evaluator(Counter)]
+async fn eval(result: serde_json::Value) -> BitsyResult<Option<SerdeValue>> {
     Ok(None)
 }
 
@@ -65,7 +70,12 @@ async fn main() -> BitsyResult<()> {
     db.set_key(key.clone(), Bytes::new()).await?;
 
     // run tasks
-    let _ = CounterTask::run(key, Some(db)).await?;
+    let result = CounterTask::run(key, Some(db)).await?;
+
+    // run evaluators
+    let eval = CounterEvaluator::eval(result.unwrap()).await?;
+
+    // now do something with the eval
 
     Ok(())
 }

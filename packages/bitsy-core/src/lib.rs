@@ -1,4 +1,5 @@
 pub mod database;
+pub mod eval;
 pub mod task;
 pub mod utils;
 
@@ -8,7 +9,7 @@ pub use bitsy_utils::type_id;
 pub use bytes::Bytes;
 pub use nom::AsBytes;
 use serde::{Deserialize, Serialize};
-pub use serde_json::Value;
+pub use serde_json::Value as SerdeValue;
 use std::{
     collections::HashMap,
     hash::{Hash, Hasher},
@@ -16,7 +17,6 @@ use std::{
 use thiserror::Error;
 pub use url::Url;
 
-// pub type Extractor = fn(&Input) -> BitsyResult<Field>;
 pub struct Input(pub Bytes);
 
 impl Input {
@@ -29,9 +29,9 @@ pub type BitsyResult<T> = Result<T, BitsyError>;
 
 pub mod prelude {
     pub use super::{
-        task::Task, type_id, utils::values_to_bytes, Arc, AsBytes, BitsyResult, Bytes,
-        Database, DatabaseKey, Extractor, Extractors, Field, FieldMetadata, FieldType,
-        Input, Key, KeyType, Metadata, Mutex, Url, Value,
+        eval::Evaluator, task::Task, type_id, utils::values_to_bytes, Arc, AsBytes,
+        BitsyResult, Bytes, Database, DatabaseKey, Extractor, Extractors, Field,
+        FieldMetadata, FieldType, Input, Key, KeyType, Metadata, Mutex, SerdeValue, Url,
     };
 }
 
@@ -80,6 +80,9 @@ pub enum BitsyError {
     BincodeError(#[from] bincode::Error),
     #[error("Utf8Error: {0:#?}")]
     Utf8Error(#[from] std::str::Utf8Error),
+    #[cfg(feature = "redisdb")]
+    #[error("RedisError: {0:#?}")]
+    RedisError(#[from] redis::RedisError),
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone, Eq)]
