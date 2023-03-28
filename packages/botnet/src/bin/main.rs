@@ -32,42 +32,38 @@ async fn root() -> &'static str {
 
 #[tokio::main]
 async fn main() -> BotnetResult<()> {
-    // setup
     let key = HttpProto::builder();
 
-    // extractors are separate from key
-    let mut extractors = Extractors::new();
-    extractors.add("ssl", extract_ssl_param);
-
-    // metadata is separate from key
-    let mut metadata = Metadata::new();
-    metadata.insert(
-        key.type_id(),
-        KeyMetadata::new()
-            .field(FieldMetadata::new(
-                "ssl",
-                "qs_ss",
-                values_to_bytes(vec![true, false, true]),
-                "description",
-            ))
-            .field(FieldMetadata::new(
-                "mkt",
-                "qs_mkt",
-                values_to_bytes(vec!["1", "2", "3"]),
-                "market",
-            ))
-            .field(FieldMetadata::new(
-                "ua",
-                "qs_ua",
-                values_to_bytes(vec!["ua1", "ua2", "ua3"]),
-                "user_agent",
-            ))
-            .build(),
-    );
-
     let config = BotnetConfig {
-        metadata,
-        extractors,
+        metadata: Metadata::from(
+            [(
+                key.type_id(),
+                KeyMetadata::new()
+                    .field(FieldMetadata::new(
+                        "ssl",
+                        "qs_ss",
+                        values_to_bytes(vec![true, false, true]),
+                        "description",
+                    ))
+                    .field(FieldMetadata::new(
+                        "mkt",
+                        "qs_mkt",
+                        values_to_bytes(vec!["1", "2", "3"]),
+                        "market",
+                    ))
+                    .field(FieldMetadata::new(
+                        "ua",
+                        "qs_ua",
+                        values_to_bytes(vec!["ua1", "ua2", "ua3"]),
+                        "user_agent",
+                    ))
+                    .build(),
+            )]
+            .into_iter(),
+        ),
+        extractors: Extractors::from(
+            [("ssl", extract_ssl_param as ExtractorFn)].into_iter(),
+        ),
         db: Some(InMemory::new()),
     };
     let app = Router::new()

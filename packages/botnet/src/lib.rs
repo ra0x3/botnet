@@ -1,4 +1,4 @@
-use crate::prelude::{Extractors, InMemory, Input, Metadata};
+use crate::prelude::{Extractors, InMemory, Input, Key, Metadata};
 use axum::http::Request;
 use std::task::{Context, Poll};
 use tower::{Layer, Service};

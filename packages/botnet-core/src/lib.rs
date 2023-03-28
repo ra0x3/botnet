@@ -29,13 +29,14 @@ impl Input {
 }
 
 pub type BotnetResult<T> = Result<T, BotnetError>;
+pub type ExtractorFn = fn(&Input) -> BotnetResult<Field>;
 
 pub mod prelude {
     pub use super::{
         database::InMemory, eval::Evaluator, task::Task, type_id, utils::values_to_bytes,
-        Arc, AsBytes, BotnetResult, Bytes, Database, DatabaseKey, Extractor, Extractors,
-        Field, FieldMetadata, FieldType, Input, Key, KeyMetadata, KeyType, Metadata,
-        Mutex, SerdeValue, Url,
+        Arc, AsBytes, BotnetResult, Bytes, Database, DatabaseKey, Extractor, ExtractorFn,
+        Extractors, Field, FieldMetadata, FieldType, Input, Key, KeyMetadata, KeyType,
+        Metadata, Mutex, SerdeValue, Url,
     };
 }
 
@@ -256,7 +257,7 @@ pub trait Key {
 pub struct Extractor {
     #[allow(unused)]
     key: String,
-    func: fn(&Input) -> BotnetResult<Field>,
+    func: ExtractorFn,
 }
 
 impl Default for Extractor {
@@ -273,7 +274,7 @@ impl Default for Extractor {
 }
 
 impl Extractor {
-    pub fn new(key: &str, func: fn(&Input) -> BotnetResult<Field>) -> Self {
+    pub fn new(key: &str, func: ExtractorFn) -> Self {
         Self {
             key: key.to_string(),
             func,
@@ -297,9 +298,21 @@ impl Extractors {
         }
     }
 
-    pub fn add(&mut self, key: &str, value: fn(&Input) -> BotnetResult<Field>) {
+    pub fn add(&mut self, key: &str, value: ExtractorFn) {
         self.items
             .insert(key.to_string(), Extractor::new(key, value));
+    }
+
+    pub fn from<'a, I>(value: I) -> Self
+    where
+        I: Iterator<Item = (&'a str, ExtractorFn)>,
+    {
+        let mut items = HashMap::new();
+        for (k, f) in value {
+            items.insert(k.to_string(), Extractor::new(k, f));
+        }
+
+        Self { items }
     }
 }
 
@@ -321,5 +334,17 @@ impl Metadata {
 
     pub fn get(&self, ty_id: &usize) -> &KeyMetadata {
         self.items.get(ty_id).unwrap()
+    }
+
+    pub fn from<'a, I>(value: I) -> Self
+    where
+        I: Iterator<Item = (usize, KeyMetadata)>,
+    {
+        let mut items = HashMap::new();
+        for (k, f) in value {
+            items.insert(k, f);
+        }
+
+        Self { items }
     }
 }
