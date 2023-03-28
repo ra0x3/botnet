@@ -1,4 +1,4 @@
-use crate::{AsBytes, BitsyResult, Bytes, Key};
+use crate::{AsBytes, BotnetResult, Bytes, Key};
 use async_std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use std::collections::HashMap;
@@ -13,10 +13,10 @@ pub trait DatabaseKey:
 
 #[async_trait]
 pub trait Database {
-    async fn set_key(&mut self, k: impl DatabaseKey, v: Bytes) -> BitsyResult<()>;
-    async fn get_key(&self, k: impl DatabaseKey) -> BitsyResult<Option<Bytes>>;
-    async fn set_bytes(&self, b: Bytes, v: Bytes) -> BitsyResult<()>;
-    async fn get_bytes(&self, k: &Bytes) -> BitsyResult<Option<Bytes>>;
+    async fn set_key(&mut self, k: impl DatabaseKey, v: Bytes) -> BotnetResult<()>;
+    async fn get_key(&self, k: impl DatabaseKey) -> BotnetResult<Option<Bytes>>;
+    async fn set_bytes(&self, b: Bytes, v: Bytes) -> BotnetResult<()>;
+    async fn get_bytes(&self, k: &Bytes) -> BotnetResult<Option<Bytes>>;
 }
 
 enum DbType {
@@ -48,21 +48,21 @@ impl Default for InMemory {
 
 #[async_trait]
 impl Database for InMemory {
-    async fn set_key(&mut self, k: impl DatabaseKey, v: Bytes) -> BitsyResult<()> {
+    async fn set_key(&mut self, k: impl DatabaseKey, v: Bytes) -> BotnetResult<()> {
         self.items.lock().await.insert(k.flatten(), v);
         Ok(())
     }
 
-    async fn get_key(&self, k: impl DatabaseKey) -> BitsyResult<Option<Bytes>> {
+    async fn get_key(&self, k: impl DatabaseKey) -> BotnetResult<Option<Bytes>> {
         Ok(self.items.lock().await.remove(&k.flatten()))
     }
 
-    async fn set_bytes(&self, k: Bytes, v: Bytes) -> BitsyResult<()> {
+    async fn set_bytes(&self, k: Bytes, v: Bytes) -> BotnetResult<()> {
         self.items.lock().await.insert(k, v);
         Ok(())
     }
 
-    async fn get_bytes(&self, k: &Bytes) -> BitsyResult<Option<Bytes>> {
+    async fn get_bytes(&self, k: &Bytes) -> BotnetResult<Option<Bytes>> {
         Ok(self.items.lock().await.remove(k))
     }
 }
@@ -74,7 +74,7 @@ pub struct Redis {
 
 #[cfg(feature = "redisdb")]
 impl Redis {
-    pub async fn new(url: &str) -> BitsyResult<Self> {
+    pub async fn new(url: &str) -> BotnetResult<Self> {
         let client = RedisClient::open(url)?;
         let conn = client.get_tokio_connection().await?;
         Ok(Self {
@@ -86,19 +86,19 @@ impl Redis {
 #[cfg(feature = "redisdb")]
 #[async_trait]
 impl Database for Redis {
-    async fn set_key(&mut self, k: impl DatabaseKey, v: Bytes) -> BitsyResult<()> {
-        self.conn.lock().await.set(k.flatten(), v).await
-    }
-
-    async fn get_key(&self, k: impl DatabaseKey) -> BitsyResult<Option<Bytes>> {
+    async fn set_key(&mut self, k: impl DatabaseKey, v: Bytes) -> BotnetResult<()> {
         unimplemented!()
     }
 
-    async fn set_bytes(&self, k: Bytes, v: Bytes) -> BitsyResult<()> {
+    async fn get_key(&self, k: impl DatabaseKey) -> BotnetResult<Option<Bytes>> {
         unimplemented!()
     }
 
-    async fn get_bytes(&self, k: &Bytes) -> BitsyResult<Option<Bytes>> {
+    async fn set_bytes(&self, k: Bytes, v: Bytes) -> BotnetResult<()> {
+        unimplemented!()
+    }
+
+    async fn get_bytes(&self, k: &Bytes) -> BotnetResult<Option<Bytes>> {
         unimplemented!()
     }
 }

@@ -1,8 +1,8 @@
-use bitsy_core::{database::InMemory, prelude::*, KeyMetadata};
-use bitsy_macros::{evaluator, key, task};
+use botnet_core::{database::InMemory, prelude::*, KeyMetadata};
+use botnet_macros::{evaluator, key, task};
 use std::collections::HashMap;
 
-fn extract_ssl_param(input: &Input) -> BitsyResult<Field> {
+fn extract_ssl_param(input: &Input) -> BotnetResult<Field> {
     let key = "ssl";
     let url = Url::parse(input.as_ref())?;
     let params: HashMap<_, _> = url.query_pairs().into_owned().collect();
@@ -17,17 +17,17 @@ struct HttpProto {
 }
 
 #[task(Counter)]
-async fn run(k: K, db: Option<D>) -> BitsyResult<Option<SerdeValue>> {
+async fn run(k: K, db: Option<D>) -> BotnetResult<Option<SerdeValue>> {
     Ok(None)
 }
 
 #[evaluator(Counter)]
-async fn eval(result: serde_json::Value) -> BitsyResult<Option<SerdeValue>> {
+async fn eval(result: serde_json::Value) -> BotnetResult<Option<SerdeValue>> {
     Ok(None)
 }
 
 #[tokio::main]
-async fn main() -> BitsyResult<()> {
+async fn main() -> BotnetResult<()> {
     // setup
     let key = HttpProto::builder();
 
@@ -73,7 +73,7 @@ async fn main() -> BitsyResult<()> {
     let result = CounterTask::run(key, Some(db)).await?;
 
     // run evaluators
-    let eval = CounterEvaluator::eval(result.unwrap()).await?;
+    let _eval = CounterEvaluator::eval(result.unwrap()).await?;
 
     // now do something with the eval
 

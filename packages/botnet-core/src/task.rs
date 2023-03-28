@@ -8,5 +8,5 @@ where
     K: DatabaseKey,
     D: Database + Send + Sync,
 {
-    async fn run(k: K, db: Option<D>) -> BitsyResult<Option<Value>>;
+    async fn run(k: K, db: Option<D>) -> BotnetResult<Option<Value>>;
 }

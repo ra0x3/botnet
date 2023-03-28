@@ -5,7 +5,7 @@ pub mod utils;
 
 pub use crate::database::{Database, DatabaseKey};
 pub use async_std::sync::{Arc, Mutex};
-pub use bitsy_utils::type_id;
+pub use botnet_utils::type_id;
 pub use bytes::Bytes;
 pub use nom::AsBytes;
 use serde::{Deserialize, Serialize};
@@ -25,12 +25,12 @@ impl Input {
     }
 }
 
-pub type BitsyResult<T> = Result<T, BitsyError>;
+pub type BotnetResult<T> = Result<T, BotnetError>;
 
 pub mod prelude {
     pub use super::{
         eval::Evaluator, task::Task, type_id, utils::values_to_bytes, Arc, AsBytes,
-        BitsyResult, Bytes, Database, DatabaseKey, Extractor, Extractors, Field,
+        BotnetResult, Bytes, Database, DatabaseKey, Extractor, Extractors, Field,
         FieldMetadata, FieldType, Input, Key, KeyType, Metadata, Mutex, SerdeValue, Url,
     };
 }
@@ -73,7 +73,7 @@ impl AsValue for &'static str {
 }
 
 #[derive(Debug, Error)]
-pub enum BitsyError {
+pub enum BotnetError {
     #[error("ParseError: {0:#?}")]
     ParseError(#[from] url::ParseError),
     #[error("BincodeError: {0:#?}")]
@@ -181,7 +181,7 @@ impl KeyMetadata {
         }
     }
 
-    pub fn as_bytes(&self) -> BitsyResult<Bytes> {
+    pub fn as_bytes(&self) -> BotnetResult<Bytes> {
         Ok(Bytes::from(bincode::serialize(&self)?))
     }
 
@@ -239,12 +239,12 @@ pub trait Key {
 pub struct Extractor {
     #[allow(unused)]
     key: String,
-    func: fn(&Input) -> BitsyResult<Field>,
+    func: fn(&Input) -> BotnetResult<Field>,
 }
 
 impl Default for Extractor {
     fn default() -> Self {
-        fn default_func(_input: &Input) -> BitsyResult<Field> {
+        fn default_func(_input: &Input) -> BotnetResult<Field> {
             Ok(Field::default())
         }
 
@@ -256,14 +256,14 @@ impl Default for Extractor {
 }
 
 impl Extractor {
-    pub fn new(key: &str, func: fn(&Input) -> BitsyResult<Field>) -> Self {
+    pub fn new(key: &str, func: fn(&Input) -> BotnetResult<Field>) -> Self {
         Self {
             key: key.to_string(),
             func,
         }
     }
 
-    pub fn call(&self, input: &Input) -> BitsyResult<Field> {
+    pub fn call(&self, input: &Input) -> BotnetResult<Field> {
         (self.func)(input)
     }
 }
@@ -280,7 +280,7 @@ impl Extractors {
         }
     }
 
-    pub fn add(&mut self, key: &str, value: fn(&Input) -> BitsyResult<Field>) {
+    pub fn add(&mut self, key: &str, value: fn(&Input) -> BotnetResult<Field>) {
         self.items
             .insert(key.to_string(), Extractor::new(key, value));
     }
