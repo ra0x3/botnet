@@ -1,3 +1,5 @@
+#![deny(unused_crate_dependencies)]
+
 pub mod database;
 pub mod eval;
 pub mod task;
