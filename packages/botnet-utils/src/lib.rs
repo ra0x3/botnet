@@ -1,3 +1,5 @@
+#![deny(unused_crate_dependencies)]
+
 use nom::AsBytes;
 
 pub fn type_id(k: impl AsBytes) -> usize {

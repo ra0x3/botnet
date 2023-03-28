@@ -1,6 +1,6 @@
 extern crate proc_macro;
 
-use bitsy_utils::type_id;
+use botnet_utils::type_id;
 use proc_macro::TokenStream;
 use proc_macro_error::proc_macro_error;
 use quote::{format_ident, quote};
@@ -125,7 +125,7 @@ fn process_key(input: TokenStream) -> TokenStream {
         }
 
         impl #ident {
-            pub fn from_input(value: Input, extractors: &Extractors, metadata: &Metadata) -> BitsyResult<Self> {
+            pub fn from_input(value: Input, extractors: &Extractors, metadata: &Metadata) -> BotnetResult<Self> {
                 let meta = metadata.get(&Self::TYPE_ID);
                 let fields = extractors.items.iter().map(|e| e.1.call(&value).expect("Failed to call on input.")).collect::<Vec<Field>>();
 
@@ -133,7 +133,7 @@ fn process_key(input: TokenStream) -> TokenStream {
                 Ok(#ident{ fields, metadata: meta.to_owned() })
             }
 
-            pub fn from_bytes(b: Bytes, metadata: &Metadata) -> BitsyResult<#ident> {
+            pub fn from_bytes(b: Bytes, metadata: &Metadata) -> BotnetResult<#ident> {
                 let mut parts = b.chunks_exact(64);
 
                 let key_ty_id = parts.next().unwrap();
@@ -144,7 +144,6 @@ fn process_key(input: TokenStream) -> TokenStream {
                 Ok(#ident::builder())
             }
         }
-
 
     };
 
