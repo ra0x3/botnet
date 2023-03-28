@@ -1,5 +1,5 @@
 use axum::{routing::get, Router};
-use botnet::{macros::*, prelude::*};
+use botnet::{macros::*, prelude::*, BotnetConfig, BotnetMiddleware};
 use std::{collections::HashMap, net::SocketAddr};
 
 fn extract_ssl_param(input: &Input) -> BotnetResult<Field> {
@@ -65,15 +65,14 @@ async fn main() -> BotnetResult<()> {
             .build(),
     );
 
-    let mut db = InMemory::new();
-
-    // online
-    let input: Input = "http://google.com?foo=true&ssl=zoo&z=shoo&shoo=baz&baz=123&user_agent=ua1&mkt=US".into();
-    let key = HttpProto::from_input(input, &extractors, &metadata)?;
-
-    db.set_key(key.clone(), Bytes::new()).await?;
-
-    let app = Router::new().route("/", get(root));
+    let config = BotnetConfig {
+        metadata,
+        extractors,
+        db: Some(InMemory::new()),
+    };
+    let app = Router::new()
+        .route("/", get(root))
+        .layer(BotnetMiddleware::from(&config));
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     tracing::debug!("listening on {}", addr);

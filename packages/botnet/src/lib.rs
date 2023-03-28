@@ -1,4 +1,4 @@
-use crate::prelude::Input;
+use crate::prelude::{Extractors, InMemory, Input, Metadata};
 use axum::http::Request;
 use std::task::{Context, Poll};
 use tower::{Layer, Service};
@@ -12,7 +12,11 @@ pub mod macros {
 }
 
 #[derive(Clone)]
-pub struct BotnetConfig {}
+pub struct BotnetConfig {
+    pub metadata: Metadata,
+    pub extractors: Extractors,
+    pub db: Option<InMemory>,
+}
 
 #[derive(Clone)]
 struct BotnetState {

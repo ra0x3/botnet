@@ -252,6 +252,7 @@ pub trait Key {
     fn name(&self) -> &'static str;
 }
 
+#[derive(Clone)]
 pub struct Extractor {
     #[allow(unused)]
     key: String,
@@ -284,7 +285,7 @@ impl Extractor {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Extractors {
     pub items: HashMap<String, Extractor>,
 }
@@ -302,7 +303,7 @@ impl Extractors {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Metadata {
     items: HashMap<usize, KeyMetadata>,
 }
