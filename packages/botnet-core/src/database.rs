@@ -3,6 +3,7 @@ use async_std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use std::collections::HashMap;
 
+#[allow(unused)]
 #[cfg(feature = "redisdb")]
 use redis::{aio::Connection as RedisConnection, AsyncCommands, Client as RedisClient};
 
@@ -69,6 +70,7 @@ impl Database for InMemory {
 
 #[cfg(feature = "redisdb")]
 pub struct Redis {
+    #[allow(unused)]
     conn: Arc<Mutex<RedisConnection>>,
 }
 
@@ -86,18 +88,22 @@ impl Redis {
 #[cfg(feature = "redisdb")]
 #[async_trait]
 impl Database for Redis {
+    #[allow(unused)]
     async fn set_key(&mut self, k: impl DatabaseKey, v: Bytes) -> BotnetResult<()> {
         unimplemented!()
     }
 
+    #[allow(unused)]
     async fn get_key(&self, k: impl DatabaseKey) -> BotnetResult<Option<Bytes>> {
         unimplemented!()
     }
 
+    #[allow(unused)]
     async fn set_bytes(&self, k: Bytes, v: Bytes) -> BotnetResult<()> {
         unimplemented!()
     }
 
+    #[allow(unused)]
     async fn get_bytes(&self, k: &Bytes) -> BotnetResult<Option<Bytes>> {
         unimplemented!()
     }
