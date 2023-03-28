@@ -9,6 +9,7 @@ pub use crate::database::{Database, DatabaseKey};
 pub use async_std::sync::{Arc, Mutex};
 pub use botnet_utils::type_id;
 pub use bytes::Bytes;
+use http::Uri;
 pub use nom::AsBytes;
 use serde::{Deserialize, Serialize};
 pub use serde_json::Value as SerdeValue;
@@ -31,9 +32,10 @@ pub type BotnetResult<T> = Result<T, BotnetError>;
 
 pub mod prelude {
     pub use super::{
-        eval::Evaluator, task::Task, type_id, utils::values_to_bytes, Arc, AsBytes,
-        BotnetResult, Bytes, Database, DatabaseKey, Extractor, Extractors, Field,
-        FieldMetadata, FieldType, Input, Key, KeyType, Metadata, Mutex, SerdeValue, Url,
+        database::InMemory, eval::Evaluator, task::Task, type_id, utils::values_to_bytes,
+        Arc, AsBytes, BotnetResult, Bytes, Database, DatabaseKey, Extractor, Extractors,
+        Field, FieldMetadata, FieldType, Input, Key, KeyMetadata, KeyType, Metadata,
+        Mutex, SerdeValue, Url,
     };
 }
 
@@ -46,6 +48,18 @@ impl AsRef<str> for Input {
 impl From<&'static str> for Input {
     fn from(value: &'static str) -> Self {
         Self::new(value)
+    }
+}
+
+impl From<String> for Input {
+    fn from(value: String) -> Self {
+        Self(Bytes::from(value))
+    }
+}
+
+impl From<&Uri> for Input {
+    fn from(value: &Uri) -> Self {
+        Input::from(value.to_string())
     }
 }
 

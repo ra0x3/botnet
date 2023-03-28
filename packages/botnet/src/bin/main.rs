@@ -1,6 +1,6 @@
-use botnet_core::{database::InMemory, prelude::*, KeyMetadata};
-use botnet_macros::{evaluator, key, task};
-use std::collections::HashMap;
+use axum::{routing::get, Router};
+use botnet::{macros::*, prelude::*};
+use std::{collections::HashMap, net::SocketAddr};
 
 fn extract_ssl_param(input: &Input) -> BotnetResult<Field> {
     let key = "ssl";
@@ -24,6 +24,10 @@ async fn run(k: K, db: Option<D>) -> BotnetResult<Option<SerdeValue>> {
 #[evaluator(Counter)]
 async fn eval(result: serde_json::Value) -> BotnetResult<Option<SerdeValue>> {
     Ok(None)
+}
+
+async fn root() -> &'static str {
+    "Hello, World!"
 }
 
 #[tokio::main]
@@ -69,13 +73,14 @@ async fn main() -> BotnetResult<()> {
 
     db.set_key(key.clone(), Bytes::new()).await?;
 
-    // run tasks
-    let result = CounterTask::run(key, Some(db)).await?;
+    let app = Router::new().route("/", get(root));
 
-    // run evaluators
-    let _eval = CounterEvaluator::eval(result.unwrap()).await?;
-
-    // now do something with the eval
+    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+    tracing::debug!("listening on {}", addr);
+    axum::Server::bind(&addr)
+        .serve(app.into_make_service())
+        .await
+        .unwrap();
 
     Ok(())
 }
