@@ -11,19 +11,9 @@ fn extract_ssl_param(input: &Input) -> BotnetResult<Field> {
 }
 
 #[key]
-struct HttpProto {
+pub struct HttpProto {
     fields: Vec<Field>,
     metadata: KeyMetadata,
-}
-
-#[task(Counter)]
-async fn run(k: K, db: Option<D>) -> BotnetResult<Option<SerdeValue>> {
-    Ok(None)
-}
-
-#[evaluator(Counter)]
-async fn eval(result: serde_json::Value) -> BotnetResult<Option<SerdeValue>> {
-    Ok(None)
 }
 
 async fn root() -> &'static str {

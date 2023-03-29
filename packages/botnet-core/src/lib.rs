@@ -35,8 +35,8 @@ pub mod prelude {
     pub use super::{
         database::InMemory, eval::Evaluator, task::Task, type_id, utils::values_to_bytes,
         Arc, AsBytes, BotnetResult, Bytes, Database, DatabaseKey, Extractor, ExtractorFn,
-        Extractors, Field, FieldMetadata, FieldType, Input, Key, KeyMetadata, KeyType,
-        Metadata, Mutex, SerdeValue, Url,
+        Extractors, Field, FieldMetadata, Input, Key, KeyMetadata, Metadata, Mutex,
+        SerdeValue, Url,
     };
 }
 
@@ -135,16 +135,6 @@ impl PartialEq for ValueMap {
         }
         false
     }
-}
-
-pub enum KeyType {
-    Compressed,
-    Decompressed,
-}
-
-pub enum FieldType {
-    Compressed,
-    Decompressed,
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone, Eq, PartialEq, Hash)]

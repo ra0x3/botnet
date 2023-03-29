@@ -4,7 +4,7 @@ use botnet_utils::type_id;
 use proc_macro::TokenStream;
 use proc_macro_error::proc_macro_error;
 use quote::{format_ident, quote};
-use syn::{parse_macro_input, Ident, ItemFn, ItemStruct};
+use syn::{parse_macro_input, Ident, ItemFn, ItemMod, ItemStruct};
 
 fn process_task(attrs: TokenStream, input: TokenStream) -> TokenStream {
     let func = parse_macro_input!(input as ItemFn);
