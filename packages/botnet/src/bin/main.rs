@@ -1,5 +1,5 @@
 use axum::{routing::get, Router};
-use botnet::{macros::*, prelude::*, BotnetConfig, BotnetMiddleware};
+use botnet::{core::botnet_key, prelude::*, BotnetConfig, BotnetMiddleware};
 use std::{collections::HashMap, net::SocketAddr};
 
 fn extract_ssl_param(input: &Input) -> BotnetResult<Field> {
@@ -10,52 +10,60 @@ fn extract_ssl_param(input: &Input) -> BotnetResult<Field> {
     Ok(Field::new(key, Bytes::from(value)))
 }
 
-#[key]
-pub struct HttpProto {
-    fields: Vec<Field>,
-    metadata: KeyMetadata,
-}
-
 async fn root() -> &'static str {
     "Hello, World!"
 }
 
 #[tokio::main]
 async fn main() -> BotnetResult<()> {
-    let key = HttpProto::builder();
+    botnet_key!(HttpProto);
+
+    let key = HttpProto::default();
 
     let config = BotnetConfig {
+        keys: HashMap::from([(key.type_id(), Box::new(key.clone()))]),
         metadata: Metadata::from(
             [(
                 key.type_id(),
-                KeyMetadata::new()
-                    .field(FieldMetadata::new(
-                        "ssl",
-                        "qs_ss",
-                        values_to_bytes(vec![true, false, true]),
-                        "description",
-                    ))
-                    .field(FieldMetadata::new(
-                        "mkt",
-                        "qs_mkt",
-                        values_to_bytes(vec!["1", "2", "3"]),
-                        "market",
-                    ))
-                    .field(FieldMetadata::new(
-                        "ua",
-                        "qs_ua",
-                        values_to_bytes(vec!["ua1", "ua2", "ua3"]),
-                        "user_agent",
-                    ))
-                    .build(),
+                KeyMetadata::from(
+                    key.type_id(),
+                    [
+                        FieldMetadata::new(
+                            "ssl",
+                            "qs_ss",
+                            values_to_bytes(vec![true, false, true]),
+                            "description",
+                        ),
+                        FieldMetadata::new(
+                            "mkt",
+                            "qs_mkt",
+                            values_to_bytes(vec!["1", "2", "3"]),
+                            "market",
+                        ),
+                        FieldMetadata::new(
+                            "ua",
+                            "qs_ua",
+                            values_to_bytes(vec!["ua1", "ua2", "ua3"]),
+                            "user_agent",
+                        ),
+                    ]
+                    .into_iter(),
+                ),
             )]
             .into_iter(),
         ),
         extractors: Extractors::from(
-            [("ssl", extract_ssl_param as ExtractorFn)].into_iter(),
+            [(
+                key.type_id(),
+                KeyExtractors::from(
+                    [("ssl", extract_ssl_param as ExtractorFn)].into_iter(),
+                ),
+            )]
+            .into_iter(),
         ),
         db: Some(InMemory::new()),
     };
+
     let app = Router::new()
         .route("/", get(root))
         .layer(BotnetMiddleware::from(&config));

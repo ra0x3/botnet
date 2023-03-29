@@ -1,7 +1,14 @@
-use crate::prelude::{Extractors, InMemory, Input, Metadata};
+use crate::prelude::{Extractors, InMemory, Input, Key, Metadata};
 use axum::http::Request;
-use std::task::{Context, Poll};
+use std::{
+    collections::HashMap,
+    task::{Context, Poll},
+};
 use tower::{Layer, Service};
+
+pub mod core {
+    pub use botnet_core::{botnet_key, *};
+}
 
 pub mod prelude {
     pub use botnet_core::prelude::*;
@@ -12,24 +19,31 @@ pub mod macros {
 }
 
 #[derive(Clone)]
-pub struct BotnetConfig {
+pub struct BotnetConfig<K: Key + Clone> {
+    pub keys: HashMap<usize, Box<K>>,
     pub metadata: Metadata,
     pub extractors: Extractors,
     pub db: Option<InMemory>,
 }
 
 #[derive(Clone)]
-struct BotnetState {
-    config: BotnetConfig,
+struct BotnetState<K>
+where
+    K: Key + Clone,
+{
+    config: BotnetConfig<K>,
 }
 
 #[derive(Clone)]
-pub struct BotnetMiddleware {
-    state: BotnetState,
+pub struct BotnetMiddleware<K: Key + Clone> {
+    state: BotnetState<K>,
 }
 
-impl From<&BotnetConfig> for BotnetMiddleware {
-    fn from(config: &BotnetConfig) -> Self {
+impl<K> From<&BotnetConfig<K>> for BotnetMiddleware<K>
+where
+    K: Key + Clone,
+{
+    fn from(config: &BotnetConfig<K>) -> Self {
         Self {
             state: BotnetState {
                 config: config.clone(),
@@ -38,8 +52,11 @@ impl From<&BotnetConfig> for BotnetMiddleware {
     }
 }
 
-impl<S> Layer<S> for BotnetMiddleware {
-    type Service = BotnetService<S>;
+impl<S, K> Layer<S> for BotnetMiddleware<K>
+where
+    K: Key + Clone,
+{
+    type Service = BotnetService<S, K>;
 
     fn layer(&self, inner: S) -> Self::Service {
         BotnetService {
@@ -50,14 +67,15 @@ impl<S> Layer<S> for BotnetMiddleware {
 }
 
 #[derive(Clone)]
-pub struct BotnetService<S> {
+pub struct BotnetService<S, K: Key + Clone> {
     inner: S,
-    state: BotnetState,
+    state: BotnetState<K>,
 }
 
-impl<S, B> Service<Request<B>> for BotnetService<S>
+impl<S, B, K> Service<Request<B>> for BotnetService<S, K>
 where
     S: Service<Request<B>>,
+    K: Key + Clone,
 {
     type Response = S::Response;
     type Error = S::Error;

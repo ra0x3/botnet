@@ -1,4 +1,5 @@
 #![deny(unused_crate_dependencies)]
+#[macro_use]
 
 pub mod database;
 pub mod eval;
@@ -35,8 +36,8 @@ pub mod prelude {
     pub use super::{
         database::InMemory, eval::Evaluator, task::Task, type_id, utils::values_to_bytes,
         Arc, AsBytes, BotnetResult, Bytes, Database, DatabaseKey, Extractor, ExtractorFn,
-        Extractors, Field, FieldMetadata, Input, Key, KeyMetadata, Metadata, Mutex,
-        SerdeValue, Url,
+        Extractors, Field, FieldMetadata, Input, Key, KeyExtractors, KeyMetadata,
+        Metadata, Mutex, SerdeValue, Url,
     };
 }
 
@@ -207,6 +208,21 @@ impl KeyMetadata {
             type_id,
         }
     }
+
+    pub fn from<I>(type_id: usize, value: I) -> Self
+    where
+        I: Iterator<Item = FieldMetadata>,
+    {
+        let mut field_meta = HashMap::new();
+        for f in value {
+            field_meta.insert(f.name.clone(), f);
+        }
+
+        Self {
+            type_id,
+            field_meta,
+        }
+    }
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone, Eq, PartialEq, Hash)]
@@ -227,18 +243,8 @@ impl Field {
 }
 
 pub trait Key {
-    const NAME: &'static str;
-    const TYPE_ID: usize;
-
-    type Item;
-    type Metadata;
-
-    fn build(&self) -> Self;
-    fn field(&mut self, f: Self::Item) -> &mut Self;
     fn flatten(&self) -> Bytes;
-    fn get_metadata(&self) -> Self::Metadata;
-    fn metadata(&mut self, meta: KeyMetadata) -> &mut Self;
-    fn builder() -> Self;
+    fn get_metadata(&self) -> KeyMetadata;
     fn type_id(&self) -> usize;
     fn name(&self) -> &'static str;
 }
@@ -277,11 +283,11 @@ impl Extractor {
 }
 
 #[derive(Default, Clone)]
-pub struct Extractors {
+pub struct KeyExtractors {
     pub items: HashMap<String, Extractor>,
 }
 
-impl Extractors {
+impl KeyExtractors {
     pub fn new() -> Self {
         Self {
             items: HashMap::default(),
@@ -326,7 +332,7 @@ impl Metadata {
         self.items.get(ty_id).unwrap()
     }
 
-    pub fn from<'a, I>(value: I) -> Self
+    pub fn from<I>(value: I) -> Self
     where
         I: Iterator<Item = (usize, KeyMetadata)>,
     {
@@ -337,4 +343,50 @@ impl Metadata {
 
         Self { items }
     }
+}
+
+#[derive(Default, Clone)]
+pub struct Extractors {
+    items: HashMap<usize, KeyExtractors>,
+}
+
+impl Extractors {
+    pub fn new() -> Self {
+        Self {
+            items: HashMap::default(),
+        }
+    }
+
+    pub fn insert(&mut self, ty_id: usize, exts: KeyExtractors) {
+        self.items.insert(ty_id, exts);
+    }
+
+    pub fn get(&self, ty_id: &usize) -> &KeyExtractors {
+        self.items.get(ty_id).unwrap()
+    }
+
+    pub fn from<I>(value: I) -> Self
+    where
+        I: Iterator<Item = (usize, KeyExtractors)>,
+    {
+        let mut items = HashMap::new();
+        for (k, f) in value {
+            items.insert(k, f);
+        }
+
+        Self { items }
+    }
+}
+
+#[macro_export]
+macro_rules! botnet_key {
+    ($name: ident) => {
+        use botnet_macros::key;
+
+        #[key]
+        pub struct $name {
+            fields: Vec<Field>,
+            metadata: KeyMetadata,
+        }
+    };
 }
