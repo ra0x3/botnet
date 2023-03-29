@@ -19,7 +19,7 @@ pub mod macros {
 }
 
 #[derive(Clone)]
-pub struct BotnetConfig<K: Key + Clone> {
+pub struct BotnetStateConfig<K: Key + Clone> {
     pub keys: HashMap<usize, Box<K>>,
     pub metadata: Metadata,
     pub extractors: Extractors,
@@ -31,7 +31,7 @@ struct BotnetState<K>
 where
     K: Key + Clone,
 {
-    config: BotnetConfig<K>,
+    config: BotnetStateConfig<K>,
 }
 
 #[derive(Clone)]
@@ -39,11 +39,11 @@ pub struct BotnetMiddleware<K: Key + Clone> {
     state: BotnetState<K>,
 }
 
-impl<K> From<&BotnetConfig<K>> for BotnetMiddleware<K>
+impl<K> From<&BotnetStateConfig<K>> for BotnetMiddleware<K>
 where
     K: Key + Clone,
 {
-    fn from(config: &BotnetConfig<K>) -> Self {
+    fn from(config: &BotnetStateConfig<K>) -> Self {
         Self {
             state: BotnetState {
                 config: config.clone(),

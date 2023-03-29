@@ -2,11 +2,12 @@
 #[macro_use]
 
 pub mod database;
+pub mod config;
 pub mod eval;
 pub mod task;
 pub mod utils;
 
-pub use crate::database::{Database, DatabaseKey};
+pub use crate::database::{Database, DatabaseKey, InMemory};
 pub use async_std::sync::{Arc, Mutex};
 pub use botnet_utils::type_id;
 pub use bytes::Bytes;
@@ -17,6 +18,7 @@ pub use serde_json::Value as SerdeValue;
 use std::{
     collections::HashMap,
     hash::{Hash, Hasher},
+    io::Error as IoError,
 };
 use thiserror::Error;
 pub use url::Url;
@@ -34,10 +36,9 @@ pub type ExtractorFn = fn(&Input) -> BotnetResult<Field>;
 
 pub mod prelude {
     pub use super::{
-        database::InMemory, eval::Evaluator, task::Task, type_id, utils::values_to_bytes,
-        Arc, AsBytes, BotnetResult, Bytes, Database, DatabaseKey, Extractor, ExtractorFn,
-        Extractors, Field, FieldMetadata, Input, Key, KeyExtractors, KeyMetadata,
-        Metadata, Mutex, SerdeValue, Url,
+        eval::Evaluator, task::Task, type_id, utils, BotnetResult, Database, DatabaseKey,
+        Extractor, ExtractorFn, Extractors, Field, FieldMetadata, InMemory, Input, Key,
+        KeyExtractors, KeyMetadata, Metadata, Url,
     };
 }
 
@@ -101,6 +102,10 @@ pub enum BotnetError {
     #[cfg(feature = "redisdb")]
     #[error("RedisError: {0:#?}")]
     RedisError(#[from] redis::RedisError),
+    #[error("SerdeYamlError: {0:#?}")]
+    SerdeYamlError(#[from] serde_yaml::Error),
+    #[error("IoError: {0:#?}")]
+    IoError(#[from] IoError),
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone, Eq)]
@@ -213,10 +218,9 @@ impl KeyMetadata {
     where
         I: Iterator<Item = FieldMetadata>,
     {
-        let mut field_meta = HashMap::new();
-        for f in value {
-            field_meta.insert(f.name.clone(), f);
-        }
+        let field_meta = value
+            .map(|f| (f.name.clone(), f))
+            .collect::<HashMap<String, FieldMetadata>>();
 
         Self {
             type_id,
@@ -303,10 +307,9 @@ impl KeyExtractors {
     where
         I: Iterator<Item = (&'a str, ExtractorFn)>,
     {
-        let mut items = HashMap::new();
-        for (k, f) in value {
-            items.insert(k.to_string(), Extractor::new(k, f));
-        }
+        let items = value
+            .map(|(k, v)| (k.to_string(), Extractor::new(k, v)))
+            .collect::<HashMap<String, Extractor>>();
 
         Self { items }
     }
@@ -336,10 +339,7 @@ impl Metadata {
     where
         I: Iterator<Item = (usize, KeyMetadata)>,
     {
-        let mut items = HashMap::new();
-        for (k, f) in value {
-            items.insert(k, f);
-        }
+        let items = value.collect::<HashMap<usize, KeyMetadata>>();
 
         Self { items }
     }
@@ -369,10 +369,7 @@ impl Extractors {
     where
         I: Iterator<Item = (usize, KeyExtractors)>,
     {
-        let mut items = HashMap::new();
-        for (k, f) in value {
-            items.insert(k, f);
-        }
+        let items = value.collect::<HashMap<usize, KeyExtractors>>();
 
         Self { items }
     }
