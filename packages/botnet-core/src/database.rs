@@ -20,12 +20,14 @@ pub trait Database {
     async fn get_bytes(&self, k: &Bytes) -> BotnetResult<Option<Bytes>>;
 }
 
+#[derive(Clone)]
 enum DbType {
     InMemory,
     #[allow(unused)]
     Redis,
 }
 
+#[derive(Clone)]
 pub struct InMemory {
     #[allow(unused)]
     db_type: DbType,
