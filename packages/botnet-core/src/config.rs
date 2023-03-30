@@ -21,9 +21,15 @@ struct Field {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
-struct Key {
+pub struct Key {
     name: String,
     fields: Vec<Field>,
+}
+
+impl Key {
+    pub fn name(&self) -> &str {
+        &self.name
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
@@ -56,5 +62,9 @@ impl BotnetConfig {
         let config: BotnetConfig = serde_yaml::from_str(&content)?;
 
         Ok(config)
+    }
+
+    pub fn keys(&self) -> &Vec<Key> {
+        &self.keys
     }
 }

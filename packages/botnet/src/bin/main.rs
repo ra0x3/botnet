@@ -1,5 +1,9 @@
 use axum::{routing::get, Router};
-use botnet::{core::config::BotnetConfig, prelude::*, Botnet, BotnetMiddleware};
+use botnet::{
+    core::config::BotnetConfig,
+    prelude::*,
+    service::{Botnet, BotnetMiddleware},
+};
 use clap::Parser;
 use std::{net::SocketAddr, path::PathBuf};
 
@@ -36,13 +40,13 @@ pub mod user_lib {
 #[tokio::main]
 async fn main() -> BotnetResult<()> {
     let opts = Args::parse();
-    let _config = BotnetConfig::from_path(opts.config).unwrap_or_default();
+    let config = BotnetConfig::from_path(opts.config).unwrap_or_default();
 
-    let state = Botnet::default();
+    let state = Botnet::from(config);
 
     let app = Router::new()
         .route("/", get(user_lib::web::root))
-        .layer(BotnetMiddleware::from(&state));
+        .layer(BotnetMiddleware::from(state));
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     tracing::debug!("listening on {}", addr);

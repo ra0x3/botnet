@@ -403,17 +403,14 @@ impl BotnetKey {
     }
 
     pub fn from_input(
-        value: Input,
+        value: &Input,
         extractors: &FieldExtractors,
-        metadata: &Metadata,
-        key: &str,
+        meta: &KeyMetadata,
     ) -> BotnetResult<Self> {
-        let ty_id = type_id(key);
-        let meta = metadata.get(&ty_id);
         let fields = extractors
             .items
             .iter()
-            .map(|e| e.1.call(&value).expect("Failed to call on input."))
+            .map(|e| e.1.call(value).expect("Failed to call on input."))
             .collect::<Vec<Field>>();
 
         // TODO: use builder pattern
