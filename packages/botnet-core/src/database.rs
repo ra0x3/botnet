@@ -1,4 +1,4 @@
-use crate::{AsBytes, BotnetResult, Bytes, Key};
+use crate::{BotnetKey, BotnetResult, Bytes};
 use async_std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use std::collections::HashMap;
@@ -7,15 +7,10 @@ use std::collections::HashMap;
 #[cfg(feature = "redisdb")]
 use redis::{aio::Connection as RedisConnection, AsyncCommands, Client as RedisClient};
 
-pub trait DatabaseKey:
-    Key + AsBytes + std::cmp::Eq + std::hash::Hash + Send + Sync
-{
-}
-
 #[async_trait]
 pub trait Database {
-    async fn set_key(&mut self, k: impl DatabaseKey, v: Bytes) -> BotnetResult<()>;
-    async fn get_key(&self, k: impl DatabaseKey) -> BotnetResult<Option<Bytes>>;
+    async fn set_key(&mut self, k: BotnetKey, v: Bytes) -> BotnetResult<()>;
+    async fn get_key(&self, k: BotnetKey) -> BotnetResult<Option<Bytes>>;
     async fn set_bytes(&self, b: Bytes, v: Bytes) -> BotnetResult<()>;
     async fn get_bytes(&self, k: &Bytes) -> BotnetResult<Option<Bytes>>;
 }
@@ -51,12 +46,12 @@ impl Default for InMemory {
 
 #[async_trait]
 impl Database for InMemory {
-    async fn set_key(&mut self, k: impl DatabaseKey, v: Bytes) -> BotnetResult<()> {
+    async fn set_key(&mut self, k: BotnetKey, v: Bytes) -> BotnetResult<()> {
         self.items.lock().await.insert(k.flatten(), v);
         Ok(())
     }
 
-    async fn get_key(&self, k: impl DatabaseKey) -> BotnetResult<Option<Bytes>> {
+    async fn get_key(&self, k: BotnetKey) -> BotnetResult<Option<Bytes>> {
         Ok(self.items.lock().await.remove(&k.flatten()))
     }
 
@@ -91,12 +86,12 @@ impl Redis {
 #[async_trait]
 impl Database for Redis {
     #[allow(unused)]
-    async fn set_key(&mut self, k: impl DatabaseKey, v: Bytes) -> BotnetResult<()> {
+    async fn set_key(&mut self, k: BotnetKey, v: Bytes) -> BotnetResult<()> {
         unimplemented!()
     }
 
     #[allow(unused)]
-    async fn get_key(&self, k: impl DatabaseKey) -> BotnetResult<Option<Bytes>> {
+    async fn get_key(&self, k: BotnetKey) -> BotnetResult<Option<Bytes>> {
         unimplemented!()
     }
 

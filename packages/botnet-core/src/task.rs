@@ -1,27 +1,37 @@
 use crate::prelude::*;
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 #[async_trait]
-pub trait Task<K, D>
+pub trait Task<D>
 where
-    K: DatabaseKey,
     D: Database + Send + Sync,
 {
-    async fn run(k: K, db: Option<D>) -> BotnetResult<Option<Value>>;
+    async fn run(k: BotnetKey, db: Option<D>) -> BotnetResult<Option<Value>>;
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(rename_all = "snake_case")]
 pub enum EntityCounter {
+    #[default]
     IpUa,
     Other,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(rename_all = "snake_case")]
 pub enum KAnonimity {
+    #[default]
+    K100,
     K800,
     K8000,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(rename_all = "snake_case")]
 pub enum Rate {
+    #[default]
     V1,
     V2,
 }

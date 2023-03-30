@@ -1,4 +1,4 @@
-use crate::prelude::{Extractors, InMemory, Input, Key, Metadata};
+use crate::prelude::{BotnetKey, Extractors, InMemory, Input, Metadata};
 use axum::http::Request;
 use std::{
     collections::HashMap,
@@ -18,32 +18,26 @@ pub mod macros {
     pub use botnet_macros::*;
 }
 
-#[derive(Clone)]
-pub struct BotnetStateConfig<K: Key + Clone> {
-    pub keys: HashMap<usize, Box<K>>,
+#[derive(Clone, Default)]
+pub struct Botnet {
+    pub keys: HashMap<usize, BotnetKey>,
     pub metadata: Metadata,
     pub extractors: Extractors,
     pub db: Option<InMemory>,
 }
 
 #[derive(Clone)]
-struct BotnetState<K>
-where
-    K: Key + Clone,
-{
-    config: BotnetStateConfig<K>,
+struct BotnetState {
+    config: Botnet,
 }
 
 #[derive(Clone)]
-pub struct BotnetMiddleware<K: Key + Clone> {
-    state: BotnetState<K>,
+pub struct BotnetMiddleware {
+    state: BotnetState,
 }
 
-impl<K> From<&BotnetStateConfig<K>> for BotnetMiddleware<K>
-where
-    K: Key + Clone,
-{
-    fn from(config: &BotnetStateConfig<K>) -> Self {
+impl From<&Botnet> for BotnetMiddleware {
+    fn from(config: &Botnet) -> Self {
         Self {
             state: BotnetState {
                 config: config.clone(),
@@ -52,11 +46,8 @@ where
     }
 }
 
-impl<S, K> Layer<S> for BotnetMiddleware<K>
-where
-    K: Key + Clone,
-{
-    type Service = BotnetService<S, K>;
+impl<S> Layer<S> for BotnetMiddleware {
+    type Service = BotnetService<S>;
 
     fn layer(&self, inner: S) -> Self::Service {
         BotnetService {
@@ -67,15 +58,14 @@ where
 }
 
 #[derive(Clone)]
-pub struct BotnetService<S, K: Key + Clone> {
+pub struct BotnetService<S> {
     inner: S,
-    state: BotnetState<K>,
+    state: BotnetState,
 }
 
-impl<S, B, K> Service<Request<B>> for BotnetService<S, K>
+impl<S, B> Service<Request<B>> for BotnetService<S>
 where
     S: Service<Request<B>>,
-    K: Key + Clone,
 {
     type Response = S::Response;
     type Error = S::Error;

@@ -1,13 +1,10 @@
 use axum::{routing::get, Router};
-use botnet::{
-    core::{botnet_key, config::Config, AsBytes, Bytes},
-    prelude::*,
-    BotnetMiddleware, BotnetStateConfig,
-};
+use botnet::{core::config::BotnetConfig, prelude::*, Botnet, BotnetMiddleware};
 use clap::Parser;
-use std::{collections::HashMap, net::SocketAddr, path::PathBuf};
+use std::{net::SocketAddr, path::PathBuf};
 
 #[derive(Parser)]
+#[clap(name = "botnet", about = "Botnet example.")]
 struct Args {
     #[clap(short, long, help = "Path to configuration file.")]
     pub config: Option<PathBuf>,
@@ -38,63 +35,14 @@ pub mod user_lib {
 
 #[tokio::main]
 async fn main() -> BotnetResult<()> {
-    botnet_key!(HttpProto);
+    let opts = Args::parse();
+    let _config = BotnetConfig::from_path(opts.config).unwrap_or_default();
 
-    let _config = Config::default();
-
-    let key = HttpProto::default();
-
-    let config = BotnetStateConfig {
-        keys: HashMap::from([(key.type_id(), Box::new(key.clone()))]),
-        metadata: Metadata::from(
-            [(
-                key.type_id(),
-                KeyMetadata::from(
-                    key.type_id(),
-                    [
-                        FieldMetadata::new(
-                            "ssl",
-                            "qs_ss",
-                            utils::values_to_bytes(vec![true, false, true]),
-                            "description",
-                        ),
-                        FieldMetadata::new(
-                            "mkt",
-                            "qs_mkt",
-                            utils::values_to_bytes(vec!["1", "2", "3"]),
-                            "market",
-                        ),
-                        FieldMetadata::new(
-                            "ua",
-                            "qs_ua",
-                            utils::values_to_bytes(vec!["ua1", "ua2", "ua3"]),
-                            "user_agent",
-                        ),
-                    ]
-                    .into_iter(),
-                ),
-            )]
-            .into_iter(),
-        ),
-        extractors: Extractors::from(
-            [(
-                key.type_id(),
-                KeyExtractors::from(
-                    [(
-                        "ssl",
-                        user_lib::extractors::extract_ssl_param as ExtractorFn,
-                    )]
-                    .into_iter(),
-                ),
-            )]
-            .into_iter(),
-        ),
-        db: Some(InMemory::new()),
-    };
+    let state = Botnet::default();
 
     let app = Router::new()
         .route("/", get(user_lib::web::root))
-        .layer(BotnetMiddleware::from(&config));
+        .layer(BotnetMiddleware::from(&state));
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     tracing::debug!("listening on {}", addr);

@@ -7,7 +7,7 @@ pub mod eval;
 pub mod task;
 pub mod utils;
 
-pub use crate::database::{Database, DatabaseKey, InMemory};
+pub use crate::database::{Database, InMemory};
 pub use async_std::sync::{Arc, Mutex};
 pub use botnet_utils::type_id;
 pub use bytes::Bytes;
@@ -36,9 +36,9 @@ pub type ExtractorFn = fn(&Input) -> BotnetResult<Field>;
 
 pub mod prelude {
     pub use super::{
-        eval::Evaluator, task::Task, type_id, utils, BotnetResult, Database, DatabaseKey,
-        Extractor, ExtractorFn, Extractors, Field, FieldMetadata, InMemory, Input, Key,
-        KeyExtractors, KeyMetadata, Metadata, Url,
+        eval::Evaluator, task::Task, type_id, utils, BotnetKey, BotnetResult, Database,
+        Extractor, ExtractorFn, Extractors, Field, FieldExtractors, FieldMetadata,
+        InMemory, Input, KeyMetadata, Metadata, Url,
     };
 }
 
@@ -168,6 +168,7 @@ impl FieldMetadata {
 pub struct KeyMetadata {
     field_meta: HashMap<String, FieldMetadata>,
     type_id: usize,
+    name: String,
 }
 
 impl Hash for KeyMetadata {
@@ -186,35 +187,22 @@ impl PartialEq for KeyMetadata {
     }
 }
 
+impl From<KeyMetadata> for Bytes {
+    fn from(val: KeyMetadata) -> Self {
+        Bytes::from(bincode::serialize(&val).expect("Bad serialization."))
+    }
+}
+
 impl KeyMetadata {
     pub fn new() -> Self {
         Self {
             type_id: 0,
             field_meta: HashMap::default(),
+            name: "".to_string(),
         }
     }
 
-    pub fn as_bytes(&self) -> BotnetResult<Bytes> {
-        Ok(Bytes::from(bincode::serialize(&self)?))
-    }
-
-    pub fn field(&mut self, f: FieldMetadata) -> &mut Self {
-        self.field_meta.insert(f.name.clone(), f);
-        self
-    }
-
-    pub fn build(&self) -> Self {
-        self.clone()
-    }
-
-    pub fn with_key_code(meta: Self, type_id: usize) -> Self {
-        Self {
-            field_meta: meta.field_meta,
-            type_id,
-        }
-    }
-
-    pub fn from<I>(type_id: usize, value: I) -> Self
+    pub fn from<I>(type_id: usize, name: &str, value: I) -> Self
     where
         I: Iterator<Item = FieldMetadata>,
     {
@@ -225,7 +213,12 @@ impl KeyMetadata {
         Self {
             type_id,
             field_meta,
+            name: name.to_string(),
         }
+    }
+
+    pub fn type_id(&self) -> usize {
+        self.type_id
     }
 }
 
@@ -246,12 +239,12 @@ impl Field {
     }
 }
 
-pub trait Key {
-    fn flatten(&self) -> Bytes;
-    fn get_metadata(&self) -> KeyMetadata;
-    fn type_id(&self) -> usize;
-    fn name(&self) -> &'static str;
-}
+// pub trait Key where Self: Clone {
+//     fn flatten(&self) -> Bytes;
+//     fn get_metadata(&self) -> KeyMetadata;
+//     fn type_id(&self) -> usize;
+//     fn name(&self) -> &'static str;
+// }
 
 #[derive(Clone)]
 pub struct Extractor {
@@ -287,11 +280,11 @@ impl Extractor {
 }
 
 #[derive(Default, Clone)]
-pub struct KeyExtractors {
+pub struct FieldExtractors {
     pub items: HashMap<String, Extractor>,
 }
 
-impl KeyExtractors {
+impl FieldExtractors {
     pub fn new() -> Self {
         Self {
             items: HashMap::default(),
@@ -347,7 +340,7 @@ impl Metadata {
 
 #[derive(Default, Clone)]
 pub struct Extractors {
-    items: HashMap<usize, KeyExtractors>,
+    items: HashMap<usize, FieldExtractors>,
 }
 
 impl Extractors {
@@ -357,21 +350,92 @@ impl Extractors {
         }
     }
 
-    pub fn insert(&mut self, ty_id: usize, exts: KeyExtractors) {
+    pub fn insert(&mut self, ty_id: usize, exts: FieldExtractors) {
         self.items.insert(ty_id, exts);
     }
 
-    pub fn get(&self, ty_id: &usize) -> &KeyExtractors {
+    pub fn get(&self, ty_id: &usize) -> &FieldExtractors {
         self.items.get(ty_id).unwrap()
     }
 
     pub fn from<I>(value: I) -> Self
     where
-        I: Iterator<Item = (usize, KeyExtractors)>,
+        I: Iterator<Item = (usize, FieldExtractors)>,
     {
-        let items = value.collect::<HashMap<usize, KeyExtractors>>();
+        let items = value.collect::<HashMap<usize, FieldExtractors>>();
 
         Self { items }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Default)]
+pub struct BotnetKey {
+    metadata: KeyMetadata,
+    fields: Vec<Field>,
+}
+
+impl BotnetKey {
+    pub fn new(metadata: KeyMetadata, fields: Vec<Field>) -> Self {
+        Self { metadata, fields }
+    }
+
+    pub fn flatten(&self) -> Bytes {
+        let fields = Bytes::from(
+            self.fields
+                .iter()
+                .map(|f| usize::to_le_bytes(f.type_id).to_vec())
+                .collect::<Vec<Vec<u8>>>()
+                .into_iter()
+                .flatten()
+                .collect::<Vec<u8>>(),
+        );
+
+        let id = Bytes::from(usize::to_le_bytes(self.type_id()).to_vec());
+        Bytes::from([id, fields].concat())
+    }
+
+    pub fn type_id(&self) -> usize {
+        self.metadata.type_id()
+    }
+
+    pub fn name(&self) -> String {
+        self.metadata.name.clone()
+    }
+
+    pub fn from_input(
+        value: Input,
+        extractors: &FieldExtractors,
+        metadata: &Metadata,
+        key: &str,
+    ) -> BotnetResult<Self> {
+        let ty_id = type_id(key);
+        let meta = metadata.get(&ty_id);
+        let fields = extractors
+            .items
+            .iter()
+            .map(|e| e.1.call(&value).expect("Failed to call on input."))
+            .collect::<Vec<Field>>();
+
+        // TODO: use builder pattern
+        Ok(BotnetKey {
+            fields,
+            metadata: meta.to_owned(),
+        })
+    }
+
+    pub fn from_bytes(b: Bytes, metadata: &Metadata) -> BotnetResult<BotnetKey> {
+        let mut parts = b.chunks_exact(64);
+        let mut buff: [u8; 8] = [0u8; 8];
+
+        buff.copy_from_slice(parts.next().unwrap());
+        let key_ty_id = usize::from_le_bytes(buff);
+        let meta = metadata.get(&key_ty_id);
+
+        // TODO: finish
+        Ok(BotnetKey {
+            metadata: meta.to_owned(),
+            fields: Vec::new(),
+        })
     }
 }
 

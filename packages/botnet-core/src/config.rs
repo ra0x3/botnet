@@ -1,11 +1,22 @@
-use crate::BotnetResult;
+use crate::{
+    task::{EntityCounter, KAnonimity, Rate},
+    BotnetResult,
+};
 use serde::{Deserialize, Serialize};
-use std::{fs::File, io::Read, path::Path};
+use std::{fs::File, io::Read, path::PathBuf};
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum Version {
+    #[default]
+    V1,
+    V2,
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 struct Field {
     name: String,
-    key: Vec<u8>,
+    key: String,
     description: String,
 }
 
@@ -16,17 +27,33 @@ struct Key {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
-pub struct Config {
+struct KAnonConfig {
+    k: KAnonimity,
+    enabled: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+struct Strategy {
+    entity_counter: EntityCounter,
+    kanon: KAnonConfig,
+    rate: Rate,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct BotnetConfig {
+    version: Version,
+    strategy: Strategy,
     keys: Vec<Key>,
 }
 
-impl Config {
-    pub fn from_path(value: impl AsRef<Path>) -> BotnetResult<Self> {
-        let mut file = File::open(&value)?;
+impl BotnetConfig {
+    pub fn from_path(value: Option<PathBuf>) -> BotnetResult<Self> {
+        let value = value.unwrap_or(PathBuf::from(""));
+        let mut file = File::open(value)?;
         let mut content = String::new();
         file.read_to_string(&mut content)?;
 
-        let config: Config = serde_yaml::from_str(&content)?;
+        let config: BotnetConfig = serde_yaml::from_str(&content)?;
 
         Ok(config)
     }

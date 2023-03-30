@@ -1,0 +1,13 @@
+version: v1
+strategy:
+  entity_counter: ip_ua
+  kanon:
+    k: k100
+    enabled: true
+  rate: v1
+keys:
+  - name: http
+    fields:
+      - name: ssl
+        key: ssl
+        description: SSL parameter.
