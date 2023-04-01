@@ -1,8 +1,4 @@
-use crate::{
-    core::{task::Strategy, Botnet, BotnetParams},
-    prelude::{BotnetKey, FieldExtractors, Input, KeyMetadata},
-    utils::type_id,
-};
+use crate::{prelude::*, utils::type_id};
 use axum::{body::Body, http::Request, response::Response};
 use futures_util::future::BoxFuture;
 use lazy_static::lazy_static;
@@ -22,6 +18,27 @@ struct BotnetState {
     params: BotnetParams,
 }
 
+impl From<BotnetParams> for BotnetState {
+    fn from(val: BotnetParams) -> Self {
+        let BotnetParams {
+            keys,
+            metadata,
+            extractors,
+            db,
+            config,
+        } = val;
+        Self {
+            params: BotnetParams {
+                keys,
+                metadata,
+                extractors,
+                db,
+                config,
+            },
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct BotnetMiddleware {
     state: BotnetState,
@@ -29,9 +46,8 @@ pub struct BotnetMiddleware {
 
 impl From<BotnetParams> for BotnetMiddleware {
     fn from(val: BotnetParams) -> Self {
-        Self {
-            state: BotnetState { params: val },
-        }
+        let state: BotnetState = val.into();
+        Self { state }
     }
 }
 
@@ -101,14 +117,13 @@ where
             .iter()
             .filter_map(|k| {
                 let s = strategy.clone();
-                if s.clone().entity_counting_enabled() {
-                    let _ = s.clone().count_entity(&k);
-                    None
+                if s.entity_counting_enabled() {
+                    Some(s.count_entity(k).unwrap())
                 } else {
                     None
                 }
             })
-            .collect::<Vec<()>>();
+            .collect::<Vec<u64>>();
 
         req.extensions_mut().insert(botnet);
 

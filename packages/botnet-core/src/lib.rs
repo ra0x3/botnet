@@ -11,7 +11,6 @@ pub use crate::{
     config::BotnetConfig,
     database::{Database, InMemory},
 };
-pub use async_std::sync::{Arc, Mutex};
 pub use botnet_utils::type_id;
 pub use bytes::Bytes;
 use http::Uri;
@@ -22,6 +21,7 @@ use std::{
     collections::HashMap,
     hash::{Hash, Hasher},
     io::Error as IoError,
+    sync::{Arc, PoisonError},
 };
 use thiserror::Error;
 use tokio::task::JoinError;
@@ -39,11 +39,22 @@ pub type BotnetResult<T> = Result<T, BotnetError>;
 pub type ExtractorFn = fn(&Input) -> BotnetResult<Field>;
 
 pub mod prelude {
+
     pub use super::{
-        eval::Evaluator, task::Task, type_id, utils, BotnetKey, BotnetParams,
-        BotnetResult, Database, Extractor, ExtractorFn, Extractors, Field,
-        FieldExtractors, FieldMetadata, InMemory, Input, KeyMetadata, Metadata, Url,
+        Botnet, BotnetKey, BotnetParams, BotnetResult, Extractor, ExtractorFn,
+        Extractors, Field, FieldExtractors, FieldMetadata, Input, KeyMetadata, Metadata,
+        Url,
     };
+
+    pub use crate::utils;
+
+    pub use crate::database::{Database, InMemory};
+
+    pub use crate::config::BotnetConfig;
+
+    pub use crate::eval::Evaluator;
+
+    pub use crate::task::Strategy;
 }
 
 impl AsRef<str> for Input {
@@ -114,6 +125,14 @@ pub enum BotnetError {
     Error(#[from] Box<dyn std::error::Error>),
     #[error("JoinError: {0:#?}")]
     JoinError(#[from] JoinError),
+    #[error("Lock poisoned.")]
+    PoisonError,
+}
+
+impl<T> From<PoisonError<T>> for BotnetError {
+    fn from(_e: PoisonError<T>) -> Self {
+        Self::PoisonError
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone, Eq)]
@@ -423,7 +442,7 @@ impl BotnetKey {
         // TODO: use builder pattern
         Ok(BotnetKey {
             fields,
-            metadata: meta.to_owned(),
+            metadata: meta.clone(),
         })
     }
 
@@ -435,9 +454,9 @@ impl BotnetKey {
         let key_ty_id = usize::from_le_bytes(buff);
         let meta = metadata.get(&key_ty_id)?;
 
-        // TODO: finish
         Ok(BotnetKey {
-            metadata: meta.to_owned(),
+            metadata: meta.clone(),
+            // TODO: finish
             fields: Vec::new(),
         })
     }
@@ -458,18 +477,36 @@ macro_rules! botnet_key {
 
 #[derive(Clone, Default)]
 pub struct BotnetParams {
-    pub keys: HashMap<usize, BotnetKey>,
-    pub metadata: Metadata,
-    pub extractors: Extractors,
+    pub keys: Arc<HashMap<usize, BotnetKey>>,
+    pub metadata: Arc<Metadata>,
+    pub extractors: Arc<Extractors>,
     pub db: Option<InMemory>,
-    pub config: BotnetConfig,
+    pub config: Arc<BotnetConfig>,
 }
 
 impl From<BotnetConfig> for BotnetParams {
     fn from(val: BotnetConfig) -> Self {
         Self {
-            config: val,
+            config: val.into(),
             ..Self::default()
+        }
+    }
+}
+
+impl BotnetParams {
+    pub fn new(
+        keys: HashMap<usize, BotnetKey>,
+        metadata: Metadata,
+        extractors: Extractors,
+        db: Option<InMemory>,
+        config: BotnetConfig,
+    ) -> Self {
+        Self {
+            keys: Arc::new(keys),
+            metadata: Arc::new(metadata),
+            extractors: Arc::new(extractors),
+            db,
+            config: Arc::new(config),
         }
     }
 }

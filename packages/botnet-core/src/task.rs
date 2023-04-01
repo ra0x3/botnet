@@ -24,9 +24,9 @@ impl Strategy {
         self.params.config.strategy.entity.enabled
     }
 
-    pub async fn count_entity(&self, k: &BotnetKey) -> BotnetResult<u64> {
+    pub fn count_entity(&self, k: &BotnetKey) -> BotnetResult<u64> {
         let mut db = self.params.db.clone().expect("Database expected.");
-        db.incr_key(k).await
+        db.incr_key(k)
     }
 
     pub fn is_k_anonymous(&self) -> bool {
