@@ -10,7 +10,7 @@ use tower::{Layer, Service};
 
 lazy_static! {
     pub static ref FIELD_EXTRACTORS: FieldExtractors = FieldExtractors::default();
-    pub static ref KEY_METADATA: KeyMetadata = KeyMetadata::default();
+    pub static ref KEY_METADATA: BotnetKeyMetadata = BotnetKeyMetadata::default();
 }
 
 #[derive(Clone)]

@@ -15,3 +15,6 @@ keys:
       - name: ssl
         key: ssl
         description: SSL parameter.
+database:
+  db_type: in_memory
+  uri: ~

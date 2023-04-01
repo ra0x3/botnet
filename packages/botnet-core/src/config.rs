@@ -1,4 +1,5 @@
 use crate::BotnetResult;
+use botnet_utils::type_id;
 use serde::{Deserialize, Serialize};
 use std::{fs::File, io::Read, path::PathBuf};
 
@@ -36,21 +37,25 @@ pub enum Version {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
-struct Field {
-    name: String,
-    key: String,
-    description: String,
+pub struct Field {
+    pub name: String,
+    pub key: String,
+    pub description: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct Key {
-    name: String,
-    fields: Vec<Field>,
+    pub name: String,
+    pub fields: Vec<Field>,
 }
 
 impl Key {
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    pub fn type_id(&self) -> usize {
+        type_id(self.name.as_bytes())
     }
 }
 
@@ -80,10 +85,25 @@ pub struct Strategy {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum DbType {
+    #[default]
+    InMemory,
+    Redis,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct Database {
+    pub db_type: DbType,
+    pub uri: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct BotnetConfig {
     pub version: Version,
     pub strategy: Strategy,
     pub keys: Vec<Key>,
+    pub database: Database,
 }
 
 impl BotnetConfig {

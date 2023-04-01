@@ -27,7 +27,7 @@ pub mod user_lib {
 
     pub mod extractors {
 
-        use botnet::core::{BotnetResult, Bytes, Field, Input, Url};
+        use botnet::core::{BotnetResult, Field, Input, Url};
         use std::collections::HashMap;
 
         pub fn extract_ssl_param(input: &Input) -> BotnetResult<Field> {
@@ -35,7 +35,7 @@ pub mod user_lib {
             let url = Url::parse(input.as_ref())?;
             let params: HashMap<_, _> = url.query_pairs().into_owned().collect();
             let value = params.get(key).unwrap().to_owned();
-            Ok(Field::new(key, Bytes::from(value)))
+            Ok(Field::new(key, &value, ""))
         }
     }
 
@@ -88,9 +88,9 @@ async fn main() -> BotnetResult<()> {
     let opts = Args::parse();
     let config = BotnetConfig::from_path(opts.config).unwrap();
 
-    tracing::info!("Config: {config:?}");
-
     let state = BotnetParams::from(config);
+
+    tracing::info!("> state: {state:?}");
 
     let app = Router::new()
         .route("/", get(user_lib::web::root))

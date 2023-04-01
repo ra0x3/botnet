@@ -8,7 +8,7 @@ use std::{
 
 #[allow(unused)]
 #[cfg(feature = "redisdb")]
-use redis::{Connection as RedisConnection, Client as RedisClient};
+use redis::{Client as RedisClient, Connection as RedisConnection};
 
 #[async_trait]
 pub trait Database {
@@ -19,14 +19,14 @@ pub trait Database {
     fn incr_key(&mut self, k: &BotnetKey) -> BotnetResult<u64>;
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum DbType {
     InMemory,
     #[allow(unused)]
     Redis,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct InMemory {
     #[allow(unused)]
     db_type: DbType,
@@ -68,8 +68,10 @@ impl Database for InMemory {
     }
 
     fn incr_key(&mut self, k: &BotnetKey) -> BotnetResult<u64> {
-        let mut v = self.items.lock()?.remove(&k.flatten()).unwrap();
-        let v = v.get_u64_le() + 1;
+        let v = match self.items.lock()?.remove(&k.flatten()) {
+            Some(mut v) => v.get_u64_le() + 1,
+            None => 1,
+        };
         self.set_key(k, Bytes::from(v.to_le_bytes().to_vec()))?;
         Ok(v)
     }

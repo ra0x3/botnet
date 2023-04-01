@@ -8,7 +8,7 @@ pub mod task;
 pub mod utils;
 
 pub use crate::{
-    config::BotnetConfig,
+    config::{BotnetConfig, DbType, Field as ConfigField, Key as ConfigKey},
     database::{Database, InMemory},
 };
 pub use botnet_utils::type_id;
@@ -19,6 +19,8 @@ use serde::{Deserialize, Serialize};
 pub use serde_json::Value as SerdeValue;
 use std::{
     collections::HashMap,
+    fmt,
+    fmt::{Debug, Formatter},
     hash::{Hash, Hasher},
     io::Error as IoError,
     sync::{Arc, PoisonError},
@@ -41,8 +43,8 @@ pub type ExtractorFn = fn(&Input) -> BotnetResult<Field>;
 pub mod prelude {
 
     pub use super::{
-        Botnet, BotnetKey, BotnetParams, BotnetResult, Extractor, ExtractorFn,
-        Extractors, Field, FieldExtractors, FieldMetadata, Input, KeyMetadata, Metadata,
+        Botnet, BotnetKey, BotnetKeyMetadata, BotnetParams, BotnetResult, Extractor,
+        ExtractorFn, Extractors, Field, FieldExtractors, FieldMetadata, Input, Metadata,
         Url,
     };
 
@@ -174,17 +176,15 @@ impl PartialEq for ValueMap {
 pub struct FieldMetadata {
     name: String,
     key: String,
-    value_map: ValueMap,
     type_id: usize,
     description: String,
 }
 
 impl FieldMetadata {
-    pub fn new(name: &str, key: &str, values: Vec<Bytes>, description: &str) -> Self {
+    pub fn new(name: &str, key: &str, description: &str) -> Self {
         Self {
             name: name.to_string(),
             key: key.to_string(),
-            value_map: ValueMap::from_values(values),
             type_id: type_id(key),
             description: description.to_string(),
         }
@@ -192,13 +192,21 @@ impl FieldMetadata {
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone, Eq)]
-pub struct KeyMetadata {
+pub struct BotnetKeyMetadata {
     field_meta: HashMap<String, FieldMetadata>,
     type_id: usize,
     name: String,
 }
 
-impl Hash for KeyMetadata {
+impl From<&ConfigKey> for BotnetKey {
+    fn from(val: &ConfigKey) -> Self {
+        let metadata = BotnetKeyMetadata::new(&val.name);
+        let fields = val.fields.iter().map(Field::from).collect::<Vec<Field>>();
+        Self { metadata, fields }
+    }
+}
+
+impl Hash for BotnetKeyMetadata {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.type_id.hash(state);
         for (k, v) in self.field_meta.iter() {
@@ -208,24 +216,24 @@ impl Hash for KeyMetadata {
     }
 }
 
-impl PartialEq for KeyMetadata {
+impl PartialEq for BotnetKeyMetadata {
     fn eq(&self, other: &Self) -> bool {
         self.type_id == other.type_id
     }
 }
 
-impl From<KeyMetadata> for Bytes {
-    fn from(val: KeyMetadata) -> Self {
+impl From<BotnetKeyMetadata> for Bytes {
+    fn from(val: BotnetKeyMetadata) -> Self {
         Bytes::from(bincode::serialize(&val).expect("Bad serialization."))
     }
 }
 
-impl KeyMetadata {
-    pub fn new() -> Self {
+impl BotnetKeyMetadata {
+    pub fn new(name: &str) -> Self {
         Self {
-            type_id: 0,
+            type_id: type_id(name),
             field_meta: HashMap::default(),
-            name: "".to_string(),
+            name: name.to_string(),
         }
     }
 
@@ -252,16 +260,24 @@ impl KeyMetadata {
 #[derive(Debug, Default, Serialize, Deserialize, Clone, Eq, PartialEq, Hash)]
 pub struct Field {
     pub type_id: usize,
-    pub field_name: String,
+    pub name: String,
     pub value: Bytes,
+    pub meta: FieldMetadata,
+}
+
+impl From<&ConfigField> for Field {
+    fn from(val: &ConfigField) -> Self {
+        Self::new(&val.name, &val.key, &val.description)
+    }
 }
 
 impl Field {
-    pub fn new(field_name: &str, value: Bytes) -> Self {
+    pub fn new(name: &str, key: &str, description: &str) -> Self {
         Self {
-            type_id: type_id(field_name),
-            field_name: field_name.to_string(),
-            value,
+            type_id: type_id(name),
+            name: name.to_string(),
+            value: Bytes::from(key.as_bytes().to_owned()),
+            meta: FieldMetadata::new(name, key, description),
         }
     }
 }
@@ -271,6 +287,13 @@ pub struct Extractor {
     #[allow(unused)]
     key: String,
     func: ExtractorFn,
+}
+
+impl Debug for Extractor {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Extractor").finish()?;
+        Ok(())
+    }
 }
 
 impl Default for Extractor {
@@ -299,7 +322,7 @@ impl Extractor {
     }
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct FieldExtractors {
     pub items: HashMap<String, Extractor>,
 }
@@ -328,9 +351,9 @@ impl FieldExtractors {
     }
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct Metadata {
-    items: HashMap<usize, KeyMetadata>,
+    items: HashMap<usize, BotnetKeyMetadata>,
 }
 
 impl Metadata {
@@ -340,11 +363,11 @@ impl Metadata {
         }
     }
 
-    pub fn insert(&mut self, ty_id: usize, meta: KeyMetadata) {
+    pub fn insert(&mut self, ty_id: usize, meta: BotnetKeyMetadata) {
         self.items.insert(ty_id, meta);
     }
 
-    pub fn get(&self, ty_id: &usize) -> BotnetResult<&KeyMetadata> {
+    pub fn get(&self, ty_id: &usize) -> BotnetResult<&BotnetKeyMetadata> {
         self.items.get(ty_id).map_or(
             Err(BotnetError::Error("metadata({ty_id}) not found".into())),
             Ok,
@@ -353,15 +376,15 @@ impl Metadata {
 
     pub fn from<I>(value: I) -> Self
     where
-        I: Iterator<Item = (usize, KeyMetadata)>,
+        I: Iterator<Item = (usize, BotnetKeyMetadata)>,
     {
-        let items = value.collect::<HashMap<usize, KeyMetadata>>();
+        let items = value.collect::<HashMap<usize, BotnetKeyMetadata>>();
 
         Self { items }
     }
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct Extractors {
     items: HashMap<usize, FieldExtractors>,
 }
@@ -396,12 +419,12 @@ impl Extractors {
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Default)]
 pub struct BotnetKey {
-    metadata: KeyMetadata,
+    metadata: BotnetKeyMetadata,
     fields: Vec<Field>,
 }
 
 impl BotnetKey {
-    pub fn new(metadata: KeyMetadata, fields: Vec<Field>) -> Self {
+    pub fn new(metadata: BotnetKeyMetadata, fields: Vec<Field>) -> Self {
         Self { metadata, fields }
     }
 
@@ -431,7 +454,7 @@ impl BotnetKey {
     pub fn from_input(
         value: &Input,
         extractors: &FieldExtractors,
-        meta: &KeyMetadata,
+        meta: &BotnetKeyMetadata,
     ) -> BotnetResult<Self> {
         let fields = extractors
             .items
@@ -470,12 +493,12 @@ macro_rules! botnet_key {
         #[key]
         pub struct $name {
             fields: Vec<Field>,
-            metadata: KeyMetadata,
+            metadata: BotnetKeyMetadata,
         }
     };
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct BotnetParams {
     pub keys: Arc<HashMap<usize, BotnetKey>>,
     pub metadata: Arc<Metadata>,
@@ -486,8 +509,19 @@ pub struct BotnetParams {
 
 impl From<BotnetConfig> for BotnetParams {
     fn from(val: BotnetConfig) -> Self {
+        let db = match val.database.db_type {
+            DbType::InMemory => InMemory::new(),
+            _ => unimplemented!(),
+        };
+
+        let keys: HashMap<usize, BotnetKey> = HashMap::from_iter(
+            val.keys.iter().map(|k| (k.type_id(), BotnetKey::from(k))),
+        );
+
         Self {
             config: val.into(),
+            db: Some(db),
+            keys: Arc::new(keys),
             ..Self::default()
         }
     }
