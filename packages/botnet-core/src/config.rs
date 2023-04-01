@@ -1,9 +1,31 @@
-use crate::{
-    task::{EntityCounter, KAnonimity, Rate},
-    BotnetResult,
-};
+use crate::BotnetResult;
 use serde::{Deserialize, Serialize};
 use std::{fs::File, io::Read, path::PathBuf};
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(rename_all = "snake_case")]
+enum EntityClass {
+    #[default]
+    IpUa,
+    Other,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(rename_all = "snake_case")]
+enum KAnonimity {
+    #[default]
+    K100,
+    K800,
+    K8000,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[serde(rename_all = "snake_case")]
+enum CliffDetector {
+    #[default]
+    V1,
+    V2,
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(rename_all = "snake_case")]
@@ -33,16 +55,28 @@ impl Key {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
-struct KAnonConfig {
+struct KAnon {
     k: KAnonimity,
     enabled: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
+struct EntityCounter {
+    enabled: bool,
+    counter: EntityClass,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+struct CliffDetection {
+    enabled: bool,
+    detector: CliffDetector,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 struct Strategy {
-    entity_counter: EntityCounter,
-    kanon: KAnonConfig,
-    rate: Rate,
+    entity: EntityCounter,
+    kanon: KAnon,
+    cliff: CliffDetection,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]

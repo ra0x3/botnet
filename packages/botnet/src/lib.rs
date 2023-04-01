@@ -1,4 +1,4 @@
-mod botnet;
+pub mod service;
 
 pub mod core {
     pub use botnet_core::*;
@@ -14,8 +14,4 @@ pub mod macros {
 
 pub mod utils {
     pub use botnet_utils::*;
-}
-
-pub mod service {
-    pub use crate::botnet::*;
 }

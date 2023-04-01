@@ -7,7 +7,10 @@ pub mod eval;
 pub mod task;
 pub mod utils;
 
-pub use crate::database::{Database, InMemory};
+pub use crate::{
+    config::BotnetConfig,
+    database::{Database, InMemory},
+};
 pub use async_std::sync::{Arc, Mutex};
 pub use botnet_utils::type_id;
 pub use bytes::Bytes;
@@ -36,9 +39,9 @@ pub type ExtractorFn = fn(&Input) -> BotnetResult<Field>;
 
 pub mod prelude {
     pub use super::{
-        eval::Evaluator, task::Task, type_id, utils, BotnetKey, BotnetResult, Database,
-        Extractor, ExtractorFn, Extractors, Field, FieldExtractors, FieldMetadata,
-        InMemory, Input, KeyMetadata, Metadata, Url,
+        eval::Evaluator, task::Task, type_id, utils, BotnetKey, BotnetMeta, BotnetResult,
+        Database, Extractor, ExtractorFn, Extractors, Field, FieldExtractors,
+        FieldMetadata, InMemory, Input, KeyMetadata, Metadata, Url,
     };
 }
 
@@ -106,6 +109,8 @@ pub enum BotnetError {
     SerdeYamlError(#[from] serde_yaml::Error),
     #[error("IoError: {0:#?}")]
     IoError(#[from] IoError),
+    #[error("Error")]
+    Error(#[from] Box<dyn std::error::Error>),
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone, Eq)]
@@ -239,13 +244,6 @@ impl Field {
     }
 }
 
-// pub trait Key where Self: Clone {
-//     fn flatten(&self) -> Bytes;
-//     fn get_metadata(&self) -> KeyMetadata;
-//     fn type_id(&self) -> usize;
-//     fn name(&self) -> &'static str;
-// }
-
 #[derive(Clone)]
 pub struct Extractor {
     #[allow(unused)]
@@ -324,8 +322,11 @@ impl Metadata {
         self.items.insert(ty_id, meta);
     }
 
-    pub fn get(&self, ty_id: &usize) -> &KeyMetadata {
-        self.items.get(ty_id).unwrap()
+    pub fn get(&self, ty_id: &usize) -> BotnetResult<&KeyMetadata> {
+        self.items.get(ty_id).map_or(
+            Err(BotnetError::Error("metadata({ty_id}) not found".into())),
+            Ok,
+        )
     }
 
     pub fn from<I>(value: I) -> Self
@@ -354,8 +355,11 @@ impl Extractors {
         self.items.insert(ty_id, exts);
     }
 
-    pub fn get(&self, ty_id: &usize) -> &FieldExtractors {
-        self.items.get(ty_id).unwrap()
+    pub fn get(&self, ty_id: &usize) -> BotnetResult<&FieldExtractors> {
+        self.items.get(ty_id).map_or(
+            Err(BotnetError::Error("extractor({ty_id}) not found".into())),
+            Ok,
+        )
     }
 
     pub fn from<I>(value: I) -> Self
@@ -426,7 +430,7 @@ impl BotnetKey {
 
         buff.copy_from_slice(parts.next().unwrap());
         let key_ty_id = usize::from_le_bytes(buff);
-        let meta = metadata.get(&key_ty_id);
+        let meta = metadata.get(&key_ty_id)?;
 
         // TODO: finish
         Ok(BotnetKey {
@@ -447,4 +451,22 @@ macro_rules! botnet_key {
             metadata: KeyMetadata,
         }
     };
+}
+
+#[derive(Clone, Default)]
+pub struct BotnetMeta {
+    pub keys: HashMap<usize, BotnetKey>,
+    pub metadata: Metadata,
+    pub extractors: Extractors,
+    pub db: Option<InMemory>,
+    pub config: BotnetConfig,
+}
+
+impl From<BotnetConfig> for BotnetMeta {
+    fn from(val: BotnetConfig) -> Self {
+        Self {
+            config: val,
+            ..Self::default()
+        }
+    }
 }

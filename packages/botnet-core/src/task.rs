@@ -1,6 +1,5 @@
-use crate::prelude::*;
+use crate::{database::Database, BotnetKey, BotnetMeta, BotnetResult};
 use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 #[async_trait]
@@ -11,48 +10,29 @@ where
     async fn run(k: BotnetKey, db: Option<D>) -> BotnetResult<Option<Value>>;
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
-#[serde(rename_all = "snake_case")]
-pub enum EntityCounter {
-    #[default]
-    IpUa,
-    Other,
+pub struct Strategy {
+    #[allow(unused)]
+    meta: BotnetMeta,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
-#[serde(rename_all = "snake_case")]
-pub enum KAnonimity {
-    #[default]
-    K100,
-    K800,
-    K8000,
-}
+impl Strategy {
+    pub fn new(meta: BotnetMeta) -> Self {
+        Self { meta }
+    }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
-#[serde(rename_all = "snake_case")]
-pub enum Rate {
-    #[default]
-    V1,
-    V2,
-}
+    pub fn count_entity() -> u64 {
+        1
+    }
 
-pub fn count_entity() {
-    // User defines what an 'entity' is
-    //      or just use a simple function to start
-    //  literally just use that entity function to get the entity then
-    // increment db counter
-}
+    pub fn is_k_anonymous() -> bool {
+        true
+    }
 
-pub fn is_k_anonymous() {
-    // has met some k-anonimity according to some counter
-    //
-    // counter function can be static/dynamic
-}
+    pub fn has_hit_cliff() -> bool {
+        true
+    }
 
-pub fn has_programmatic_rate() {
-    // Use a small set of pre-defined rate functions
-}
-
-pub fn has_really_programmatic_rate() {
-    // has_programmatic_rate() ** N and such
+    pub fn has_really_hit_cliff() -> bool {
+        true
+    }
 }

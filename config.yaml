@@ -1,10 +1,14 @@
 version: v1
 strategy:
-  entity_counter: ip_ua
+  entity:
+    enabled: true
+    counter: ip_ua
   kanon:
     k: k100
     enabled: true
-  rate: v1
+  cliff:
+    enabled: true
+    detector: v1
 keys:
   - name: http
     fields:
