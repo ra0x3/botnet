@@ -24,6 +24,7 @@ use std::{
     io::Error as IoError,
 };
 use thiserror::Error;
+use tokio::task::JoinError;
 pub use url::Url;
 
 pub struct Input(pub Bytes);
@@ -39,9 +40,9 @@ pub type ExtractorFn = fn(&Input) -> BotnetResult<Field>;
 
 pub mod prelude {
     pub use super::{
-        eval::Evaluator, task::Task, type_id, utils, BotnetKey, BotnetMeta, BotnetResult,
-        Database, Extractor, ExtractorFn, Extractors, Field, FieldExtractors,
-        FieldMetadata, InMemory, Input, KeyMetadata, Metadata, Url,
+        eval::Evaluator, task::Task, type_id, utils, BotnetKey, BotnetParams,
+        BotnetResult, Database, Extractor, ExtractorFn, Extractors, Field,
+        FieldExtractors, FieldMetadata, InMemory, Input, KeyMetadata, Metadata, Url,
     };
 }
 
@@ -111,6 +112,8 @@ pub enum BotnetError {
     IoError(#[from] IoError),
     #[error("Error")]
     Error(#[from] Box<dyn std::error::Error>),
+    #[error("JoinError: {0:#?}")]
+    JoinError(#[from] JoinError),
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone, Eq)]
@@ -454,7 +457,7 @@ macro_rules! botnet_key {
 }
 
 #[derive(Clone, Default)]
-pub struct BotnetMeta {
+pub struct BotnetParams {
     pub keys: HashMap<usize, BotnetKey>,
     pub metadata: Metadata,
     pub extractors: Extractors,
@@ -462,11 +465,18 @@ pub struct BotnetMeta {
     pub config: BotnetConfig,
 }
 
-impl From<BotnetConfig> for BotnetMeta {
+impl From<BotnetConfig> for BotnetParams {
     fn from(val: BotnetConfig) -> Self {
         Self {
             config: val,
             ..Self::default()
         }
     }
+}
+
+#[derive(Clone, Default)]
+#[allow(unused)]
+pub struct Botnet {
+    is_k_anonymous: bool,
+    entity_count: u64,
 }

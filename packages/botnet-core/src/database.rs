@@ -1,6 +1,7 @@
 use crate::{BotnetKey, BotnetResult, Bytes};
 use async_std::sync::{Arc, Mutex};
 use async_trait::async_trait;
+use bytes::Buf;
 use std::collections::HashMap;
 
 #[allow(unused)]
@@ -9,10 +10,11 @@ use redis::{aio::Connection as RedisConnection, AsyncCommands, Client as RedisCl
 
 #[async_trait]
 pub trait Database {
-    async fn set_key(&mut self, k: BotnetKey, v: Bytes) -> BotnetResult<()>;
-    async fn get_key(&self, k: BotnetKey) -> BotnetResult<Option<Bytes>>;
-    async fn set_bytes(&self, b: Bytes, v: Bytes) -> BotnetResult<()>;
+    async fn set_key(&mut self, k: &BotnetKey, v: Bytes) -> BotnetResult<()>;
+    async fn get_key(&self, k: &BotnetKey) -> BotnetResult<Option<Bytes>>;
+    async fn set_bytes(&self, b: &Bytes, v: Bytes) -> BotnetResult<()>;
     async fn get_bytes(&self, k: &Bytes) -> BotnetResult<Option<Bytes>>;
+    async fn incr_key(&mut self, k: &BotnetKey) -> BotnetResult<u64>;
 }
 
 #[derive(Clone)]
@@ -46,22 +48,30 @@ impl Default for InMemory {
 
 #[async_trait]
 impl Database for InMemory {
-    async fn set_key(&mut self, k: BotnetKey, v: Bytes) -> BotnetResult<()> {
+    async fn set_key(&mut self, k: &BotnetKey, v: Bytes) -> BotnetResult<()> {
         self.items.lock().await.insert(k.flatten(), v);
         Ok(())
     }
 
-    async fn get_key(&self, k: BotnetKey) -> BotnetResult<Option<Bytes>> {
+    async fn get_key(&self, k: &BotnetKey) -> BotnetResult<Option<Bytes>> {
         Ok(self.items.lock().await.remove(&k.flatten()))
     }
 
-    async fn set_bytes(&self, k: Bytes, v: Bytes) -> BotnetResult<()> {
-        self.items.lock().await.insert(k, v);
+    async fn set_bytes(&self, k: &Bytes, v: Bytes) -> BotnetResult<()> {
+        self.items.lock().await.insert(k.clone(), v);
         Ok(())
     }
 
     async fn get_bytes(&self, k: &Bytes) -> BotnetResult<Option<Bytes>> {
         Ok(self.items.lock().await.remove(k))
+    }
+
+    async fn incr_key(&mut self, k: &BotnetKey) -> BotnetResult<u64> {
+        let mut v = self.items.lock().await.remove(&k.flatten()).unwrap();
+        let v = v.get_u64_le() + 1;
+        self.set_key(k, Bytes::from(v.to_le_bytes().to_vec()))
+            .await?;
+        Ok(v)
     }
 }
 
@@ -86,22 +96,27 @@ impl Redis {
 #[async_trait]
 impl Database for Redis {
     #[allow(unused)]
-    async fn set_key(&mut self, k: BotnetKey, v: Bytes) -> BotnetResult<()> {
+    async fn set_key(&mut self, k: &BotnetKey, v: Bytes) -> BotnetResult<()> {
         unimplemented!()
     }
 
     #[allow(unused)]
-    async fn get_key(&self, k: BotnetKey) -> BotnetResult<Option<Bytes>> {
+    async fn get_key(&self, k: &BotnetKey) -> BotnetResult<Option<Bytes>> {
         unimplemented!()
     }
 
     #[allow(unused)]
-    async fn set_bytes(&self, k: Bytes, v: Bytes) -> BotnetResult<()> {
+    async fn set_bytes(&self, k: &Bytes, v: Bytes) -> BotnetResult<()> {
         unimplemented!()
     }
 
     #[allow(unused)]
     async fn get_bytes(&self, k: &Bytes) -> BotnetResult<Option<Bytes>> {
+        unimplemented!()
+    }
+
+    #[allow(unused)]
+    async fn incr_key(&mut self, k: &BotnetKey) -> BotnetResult<u64> {
         unimplemented!()
     }
 }

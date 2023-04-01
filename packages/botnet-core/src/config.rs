@@ -4,7 +4,7 @@ use std::{fs::File, io::Read, path::PathBuf};
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(rename_all = "snake_case")]
-enum EntityClass {
+pub enum EntityClass {
     #[default]
     IpUa,
     Other,
@@ -12,7 +12,7 @@ enum EntityClass {
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(rename_all = "snake_case")]
-enum KAnonimity {
+pub enum KAnonimity {
     #[default]
     K100,
     K800,
@@ -21,7 +21,7 @@ enum KAnonimity {
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(rename_all = "snake_case")]
-enum CliffDetector {
+pub enum CliffDetector {
     #[default]
     V1,
     V2,
@@ -55,35 +55,35 @@ impl Key {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
-struct KAnon {
-    k: KAnonimity,
-    enabled: bool,
+pub struct KAnon {
+    pub k: KAnonimity,
+    pub enabled: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
-struct EntityCounter {
-    enabled: bool,
-    counter: EntityClass,
+pub struct EntityCounter {
+    pub enabled: bool,
+    pub counter: EntityClass,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
-struct CliffDetection {
-    enabled: bool,
-    detector: CliffDetector,
+pub struct CliffDetection {
+    pub enabled: bool,
+    pub detector: CliffDetector,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
-struct Strategy {
-    entity: EntityCounter,
-    kanon: KAnon,
-    cliff: CliffDetection,
+pub struct Strategy {
+    pub entity: EntityCounter,
+    pub kanon: KAnon,
+    pub cliff: CliffDetection,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct BotnetConfig {
-    version: Version,
-    strategy: Strategy,
-    keys: Vec<Key>,
+    pub version: Version,
+    pub strategy: Strategy,
+    pub keys: Vec<Key>,
 }
 
 impl BotnetConfig {

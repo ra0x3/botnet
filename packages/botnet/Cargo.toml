@@ -25,6 +25,7 @@ botnet-macros = { path = "./../botnet-macros", version = "0.2" }
 botnet-utils = { path = "./../botnet-utils", version = "0.2" }
 bytes = { version = "1.3", features = ["serde"], optional = true }
 clap = { version = "4.2", features = ["derive"], optional = true }
+futures-util = "0.3"
 lazy_static = "1.4"
 nom = { version = "5.1", optional = true }
 serde = { version = "1.0", features = ["derive"], optional = true }

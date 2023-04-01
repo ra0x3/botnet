@@ -1,11 +1,15 @@
 use crate::{
-    core::{task::Strategy, BotnetMeta},
+    core::{task::Strategy, Botnet, BotnetParams},
     prelude::{BotnetKey, FieldExtractors, Input, KeyMetadata},
     utils::type_id,
 };
-use axum::http::Request;
+use axum::{body::Body, http::Request, response::Response};
+use futures_util::future::BoxFuture;
 use lazy_static::lazy_static;
-use std::task::{Context, Poll};
+use std::{
+    rc::Rc,
+    task::{Context, Poll},
+};
 use tower::{Layer, Service};
 
 lazy_static! {
@@ -15,7 +19,7 @@ lazy_static! {
 
 #[derive(Clone)]
 struct BotnetState {
-    botnet: BotnetMeta,
+    params: BotnetParams,
 }
 
 #[derive(Clone)]
@@ -23,10 +27,10 @@ pub struct BotnetMiddleware {
     state: BotnetState,
 }
 
-impl From<BotnetMeta> for BotnetMiddleware {
-    fn from(val: BotnetMeta) -> Self {
+impl From<BotnetParams> for BotnetMiddleware {
+    fn from(val: BotnetParams) -> Self {
         Self {
-            state: BotnetState { botnet: val },
+            state: BotnetState { params: val },
         }
     }
 }
@@ -48,24 +52,27 @@ pub struct BotnetService<S> {
     state: BotnetState,
 }
 
-impl<S, B> Service<Request<B>> for BotnetService<S>
+impl<S> Service<Request<Body>> for BotnetService<S>
 where
-    S: Service<Request<B>>,
+    S: Service<Request<Body>, Response = Response> + Send + 'static,
+    S::Future: Send + 'static,
 {
     type Response = S::Response;
     type Error = S::Error;
-    type Future = S::Future;
+    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.inner.poll_ready(cx)
     }
 
-    fn call(&mut self, req: Request<B>) -> Self::Future {
+    fn call(&mut self, mut req: Request<Body>) -> Self::Future {
         let input: Input = req.uri().into();
 
-        let _keys = self
+        let botnet = Botnet::default();
+
+        let keys = self
             .state
-            .botnet
+            .params
             .config
             .keys()
             .iter()
@@ -73,22 +80,43 @@ where
                 let ty_id = type_id(k.name());
                 let exts = self
                     .state
-                    .botnet
+                    .params
                     .extractors
                     .get(&ty_id)
                     .unwrap_or(&FIELD_EXTRACTORS);
                 let meta = self
                     .state
-                    .botnet
+                    .params
                     .metadata
                     .get(&ty_id)
                     .unwrap_or(&KEY_METADATA);
+
                 BotnetKey::from_input(&input, exts, meta).unwrap_or_default()
             })
             .collect::<Vec<BotnetKey>>();
 
-        let _strategy = Strategy::new(self.state.botnet.clone());
+        let strategy = Rc::new(Strategy::new(self.state.params.clone()));
 
-        self.inner.call(req)
+        let _counts = keys
+            .iter()
+            .filter_map(|k| {
+                let s = strategy.clone();
+                if s.clone().entity_counting_enabled() {
+                    let _ = s.clone().count_entity(&k);
+                    None
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<()>>();
+
+        req.extensions_mut().insert(botnet);
+
+        let fut = self.inner.call(req);
+
+        Box::pin(async move {
+            let resp: Response = fut.await?;
+            Ok(resp)
+        })
     }
 }

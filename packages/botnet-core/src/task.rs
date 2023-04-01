@@ -1,4 +1,4 @@
-use crate::{database::Database, BotnetKey, BotnetMeta, BotnetResult};
+use crate::{database::Database, BotnetKey, BotnetParams, BotnetResult};
 use async_trait::async_trait;
 use serde_json::Value;
 
@@ -12,27 +12,32 @@ where
 
 pub struct Strategy {
     #[allow(unused)]
-    meta: BotnetMeta,
+    pub params: BotnetParams,
 }
 
 impl Strategy {
-    pub fn new(meta: BotnetMeta) -> Self {
-        Self { meta }
+    pub fn new(params: BotnetParams) -> Self {
+        Self { params }
     }
 
-    pub fn count_entity() -> u64 {
-        1
+    pub fn entity_counting_enabled(&self) -> bool {
+        self.params.config.strategy.entity.enabled
     }
 
-    pub fn is_k_anonymous() -> bool {
+    pub async fn count_entity(&self, k: &BotnetKey) -> BotnetResult<u64> {
+        let mut db = self.params.db.clone().expect("Database expected.");
+        db.incr_key(k).await
+    }
+
+    pub fn is_k_anonymous(&self) -> bool {
         true
     }
 
-    pub fn has_hit_cliff() -> bool {
+    pub fn has_hit_cliff(&self) -> bool {
         true
     }
 
-    pub fn has_really_hit_cliff() -> bool {
+    pub fn has_really_hit_cliff(&self) -> bool {
         true
     }
 }

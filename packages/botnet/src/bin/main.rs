@@ -11,7 +11,7 @@ use tower_http::{
 use tracing::Level;
 
 #[derive(Parser)]
-#[clap(name = "botnet", about = "BotnetMeta example.")]
+#[clap(name = "botnet", about = "BotnetParams example.")]
 struct Args {
     #[clap(short, long, help = "Path to configuration file.")]
     pub config: Option<PathBuf>,
@@ -90,7 +90,7 @@ async fn main() -> BotnetResult<()> {
 
     tracing::info!("Config: {config:?}");
 
-    let state = BotnetMeta::from(config);
+    let state = BotnetParams::from(config);
 
     let app = Router::new()
         .route("/", get(user_lib::web::root))
