@@ -6,7 +6,6 @@ pub mod config;
 pub mod eval;
 pub mod models;
 pub mod task;
-pub mod utils;
 
 pub use crate::{
     config::{BotnetConfig, DbType, Field as ConfigField, Key as ConfigKey},
@@ -33,8 +32,6 @@ pub mod prelude {
         ExtractorFn, Extractors, Field, FieldExtractors, FieldMetadata, Input, Metadata,
         Url,
     };
-
-    pub use crate::utils;
 
     pub use crate::database::{Database, InMemory};
 
@@ -95,30 +92,5 @@ impl From<String> for Input {
 impl From<&Uri> for Input {
     fn from(value: &Uri) -> Self {
         Input::from(value.to_string())
-    }
-}
-
-pub trait AsValue {
-    fn as_value(&self) -> Bytes;
-}
-
-impl AsValue for bool {
-    fn as_value(&self) -> Bytes {
-        match self {
-            true => Bytes::from("1"),
-            false => Bytes::from("0"),
-        }
-    }
-}
-
-impl AsValue for u64 {
-    fn as_value(&self) -> Bytes {
-        Bytes::from(u64::to_le_bytes(*self).to_vec())
-    }
-}
-
-impl AsValue for &'static str {
-    fn as_value(&self) -> Bytes {
-        Bytes::from(self.to_string())
     }
 }

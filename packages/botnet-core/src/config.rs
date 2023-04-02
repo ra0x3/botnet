@@ -20,6 +20,16 @@ pub enum KAnonimity {
     K8000,
 }
 
+impl KAnonimity {
+    pub fn k(&self) -> u64 {
+        match self {
+            Self::K100 => 100,
+            Self::K800 => 800,
+            Self::K8000 => 8000,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum CliffDetector {

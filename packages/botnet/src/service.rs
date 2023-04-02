@@ -116,14 +116,24 @@ where
         let _counts = keys
             .iter()
             .filter_map(|k| {
-                let s = strategy.clone();
-                if s.entity_counting_enabled() {
-                    Some(s.count_entity(k).unwrap())
+                if strategy.entity_counting_enabled() {
+                    Some(strategy.count_entity(k).unwrap())
                 } else {
                     None
                 }
             })
             .collect::<Vec<u64>>();
+
+        let _kanons = keys
+            .iter()
+            .filter_map(|k| {
+                if strategy.kanon_enabled() {
+                    Some(strategy.is_k_anonymous(k).unwrap())
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<bool>>();
 
         req.extensions_mut().insert(botnet);
 

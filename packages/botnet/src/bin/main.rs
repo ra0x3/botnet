@@ -90,7 +90,7 @@ async fn main() -> BotnetResult<()> {
 
     let state = BotnetParams::from(config);
 
-    tracing::info!("> state: {state:?}");
+    tracing::info!("{state:?}");
 
     let app = Router::new()
         .route("/", get(user_lib::web::root))
