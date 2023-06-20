@@ -1,33 +1,32 @@
-use crate::{AsBytes, BotnetResult, Bytes, Key};
-use async_std::sync::{Arc, Mutex};
+use crate::{BotnetKey, BotnetResult, Bytes};
 use async_trait::async_trait;
-use std::collections::HashMap;
+use bytes::Buf;
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
 #[allow(unused)]
 #[cfg(feature = "redisdb")]
-use redis::{aio::Connection as RedisConnection, AsyncCommands, Client as RedisClient};
-
-pub trait DatabaseKey:
-    Key + AsBytes + std::cmp::Eq + std::hash::Hash + Send + Sync
-{
-}
+use redis::{Client as RedisClient, Connection as RedisConnection};
 
 #[async_trait]
 pub trait Database {
-    async fn set_key(&mut self, k: impl DatabaseKey, v: Bytes) -> BotnetResult<()>;
-    async fn get_key(&self, k: impl DatabaseKey) -> BotnetResult<Option<Bytes>>;
-    async fn set_bytes(&self, b: Bytes, v: Bytes) -> BotnetResult<()>;
-    async fn get_bytes(&self, k: &Bytes) -> BotnetResult<Option<Bytes>>;
+    fn set_key(&mut self, k: &BotnetKey, v: Bytes) -> BotnetResult<()>;
+    fn get_key(&self, k: &BotnetKey) -> BotnetResult<Option<Bytes>>;
+    fn set_bytes(&self, b: &Bytes, v: Bytes) -> BotnetResult<()>;
+    fn get_bytes(&self, k: &Bytes) -> BotnetResult<Option<Bytes>>;
+    fn incr_key(&mut self, k: &BotnetKey) -> BotnetResult<u64>;
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum DbType {
     InMemory,
     #[allow(unused)]
     Redis,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct InMemory {
     #[allow(unused)]
     db_type: DbType,
@@ -49,24 +48,32 @@ impl Default for InMemory {
     }
 }
 
-#[async_trait]
 impl Database for InMemory {
-    async fn set_key(&mut self, k: impl DatabaseKey, v: Bytes) -> BotnetResult<()> {
-        self.items.lock().await.insert(k.flatten(), v);
+    fn set_key(&mut self, k: &BotnetKey, v: Bytes) -> BotnetResult<()> {
+        self.items.lock()?.insert(k.flatten(), v);
         Ok(())
     }
 
-    async fn get_key(&self, k: impl DatabaseKey) -> BotnetResult<Option<Bytes>> {
-        Ok(self.items.lock().await.remove(&k.flatten()))
+    fn get_key(&self, k: &BotnetKey) -> BotnetResult<Option<Bytes>> {
+        Ok(self.items.lock()?.remove(&k.flatten()))
     }
 
-    async fn set_bytes(&self, k: Bytes, v: Bytes) -> BotnetResult<()> {
-        self.items.lock().await.insert(k, v);
+    fn set_bytes(&self, k: &Bytes, v: Bytes) -> BotnetResult<()> {
+        self.items.lock()?.insert(k.clone(), v);
         Ok(())
     }
 
-    async fn get_bytes(&self, k: &Bytes) -> BotnetResult<Option<Bytes>> {
-        Ok(self.items.lock().await.remove(k))
+    fn get_bytes(&self, k: &Bytes) -> BotnetResult<Option<Bytes>> {
+        Ok(self.items.lock()?.remove(k))
+    }
+
+    fn incr_key(&mut self, k: &BotnetKey) -> BotnetResult<u64> {
+        let v = match self.items.lock()?.remove(&k.flatten()) {
+            Some(mut v) => v.get_u64_le() + 1,
+            None => 1,
+        };
+        self.set_key(k, Bytes::from(v.to_le_bytes().to_vec()))?;
+        Ok(v)
     }
 }
 
@@ -78,9 +85,9 @@ pub struct Redis {
 
 #[cfg(feature = "redisdb")]
 impl Redis {
-    pub async fn new(url: &str) -> BotnetResult<Self> {
+    pub fn new(url: &str) -> BotnetResult<Self> {
         let client = RedisClient::open(url)?;
-        let conn = client.get_tokio_connection().await?;
+        let conn = client.get_connection()?;
         Ok(Self {
             conn: Arc::new(Mutex::new(conn)),
         })
@@ -91,22 +98,27 @@ impl Redis {
 #[async_trait]
 impl Database for Redis {
     #[allow(unused)]
-    async fn set_key(&mut self, k: impl DatabaseKey, v: Bytes) -> BotnetResult<()> {
+    fn set_key(&mut self, k: &BotnetKey, v: Bytes) -> BotnetResult<()> {
         unimplemented!()
     }
 
     #[allow(unused)]
-    async fn get_key(&self, k: impl DatabaseKey) -> BotnetResult<Option<Bytes>> {
+    fn get_key(&self, k: &BotnetKey) -> BotnetResult<Option<Bytes>> {
         unimplemented!()
     }
 
     #[allow(unused)]
-    async fn set_bytes(&self, k: Bytes, v: Bytes) -> BotnetResult<()> {
+    fn set_bytes(&self, k: &Bytes, v: Bytes) -> BotnetResult<()> {
         unimplemented!()
     }
 
     #[allow(unused)]
-    async fn get_bytes(&self, k: &Bytes) -> BotnetResult<Option<Bytes>> {
+    fn get_bytes(&self, k: &Bytes) -> BotnetResult<Option<Bytes>> {
+        unimplemented!()
+    }
+
+    #[allow(unused)]
+    fn incr_key(&mut self, k: &BotnetKey) -> BotnetResult<u64> {
         unimplemented!()
     }
 }

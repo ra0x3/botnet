@@ -1,0 +1,20 @@
+version: v1
+strategy:
+  entity:
+    enabled: true
+    counter: ip_ua
+  kanon:
+    k: k100
+    enabled: true
+  cliff:
+    enabled: true
+    detector: v1
+keys:
+  - name: http
+    fields:
+      - name: ssl
+        key: ssl
+        description: SSL parameter.
+database:
+  db_type: in_memory
+  uri: ~

@@ -2,43 +2,73 @@
 #[macro_use]
 
 pub mod database;
+pub mod config;
 pub mod eval;
+pub mod models;
 pub mod task;
-pub mod utils;
 
-pub use crate::database::{Database, DatabaseKey};
-pub use async_std::sync::{Arc, Mutex};
-pub use botnet_utils::type_id;
-pub use bytes::Bytes;
-use http::Uri;
-pub use nom::AsBytes;
-use serde::{Deserialize, Serialize};
-pub use serde_json::Value as SerdeValue;
-use std::{
-    collections::HashMap,
-    hash::{Hash, Hasher},
+pub use crate::{
+    config::{BotnetConfig, DbType, Field as ConfigField, Key as ConfigKey},
+    database::{Database, InMemory},
+    models::*,
 };
-use thiserror::Error;
+pub use bytes::Bytes;
+pub use nom::AsBytes;
+pub use serde_json::Value as SerdeValue;
 pub use url::Url;
 
-pub struct Input(pub Bytes);
-
-impl Input {
-    pub fn new(s: &'static str) -> Self {
-        Self(Bytes::from(s.as_bytes()))
-    }
-}
+use http::Uri;
+use std::{fmt::Debug, io::Error as IoError, sync::PoisonError};
+use thiserror::Error;
+use tokio::task::JoinError;
 
 pub type BotnetResult<T> = Result<T, BotnetError>;
 pub type ExtractorFn = fn(&Input) -> BotnetResult<Field>;
 
 pub mod prelude {
+
     pub use super::{
-        database::InMemory, eval::Evaluator, task::Task, type_id, utils::values_to_bytes,
-        Arc, AsBytes, BotnetResult, Bytes, Database, DatabaseKey, Extractor, ExtractorFn,
-        Extractors, Field, FieldMetadata, Input, Key, KeyExtractors, KeyMetadata,
-        Metadata, Mutex, SerdeValue, Url,
+        Botnet, BotnetKey, BotnetKeyMetadata, BotnetParams, BotnetResult, Extractor,
+        ExtractorFn, Extractors, Field, FieldExtractors, FieldMetadata, Input, Metadata,
+        Url,
     };
+
+    pub use crate::database::{Database, InMemory};
+
+    pub use crate::config::BotnetConfig;
+
+    pub use crate::eval::Evaluator;
+
+    pub use crate::task::Strategy;
+}
+
+#[derive(Debug, Error)]
+pub enum BotnetError {
+    #[error("ParseError: {0:#?}")]
+    ParseError(#[from] url::ParseError),
+    #[error("BincodeError: {0:#?}")]
+    BincodeError(#[from] bincode::Error),
+    #[error("Utf8Error: {0:#?}")]
+    Utf8Error(#[from] std::str::Utf8Error),
+    #[cfg(feature = "redisdb")]
+    #[error("RedisError: {0:#?}")]
+    RedisError(#[from] redis::RedisError),
+    #[error("SerdeYamlError: {0:#?}")]
+    SerdeYamlError(#[from] serde_yaml::Error),
+    #[error("IoError: {0:#?}")]
+    IoError(#[from] IoError),
+    #[error("Error")]
+    Error(#[from] Box<dyn std::error::Error>),
+    #[error("JoinError: {0:#?}")]
+    JoinError(#[from] JoinError),
+    #[error("Lock poisoned.")]
+    PoisonError,
+}
+
+impl<T> From<PoisonError<T>> for BotnetError {
+    fn from(_e: PoisonError<T>) -> Self {
+        Self::PoisonError
+    }
 }
 
 impl AsRef<str> for Input {
@@ -63,330 +93,4 @@ impl From<&Uri> for Input {
     fn from(value: &Uri) -> Self {
         Input::from(value.to_string())
     }
-}
-
-pub trait AsValue {
-    fn as_value(&self) -> Bytes;
-}
-
-impl AsValue for bool {
-    fn as_value(&self) -> Bytes {
-        match self {
-            true => Bytes::from("1"),
-            false => Bytes::from("0"),
-        }
-    }
-}
-
-impl AsValue for u64 {
-    fn as_value(&self) -> Bytes {
-        Bytes::from(u64::to_le_bytes(*self).to_vec())
-    }
-}
-
-impl AsValue for &'static str {
-    fn as_value(&self) -> Bytes {
-        Bytes::from(self.to_string())
-    }
-}
-
-#[derive(Debug, Error)]
-pub enum BotnetError {
-    #[error("ParseError: {0:#?}")]
-    ParseError(#[from] url::ParseError),
-    #[error("BincodeError: {0:#?}")]
-    BincodeError(#[from] bincode::Error),
-    #[error("Utf8Error: {0:#?}")]
-    Utf8Error(#[from] std::str::Utf8Error),
-    #[cfg(feature = "redisdb")]
-    #[error("RedisError: {0:#?}")]
-    RedisError(#[from] redis::RedisError),
-}
-
-#[derive(Debug, Serialize, Deserialize, Default, Clone, Eq)]
-pub struct ValueMap {
-    items: HashMap<usize, Bytes>,
-}
-
-impl ValueMap {
-    pub fn from_values(v: Vec<Bytes>) -> Self {
-        Self {
-            items: HashMap::from_iter(
-                v.iter().map(|v| (type_id(v.as_bytes()), v.clone())),
-            ),
-        }
-    }
-}
-
-impl Hash for ValueMap {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        for (k, v) in self.items.iter() {
-            k.hash(state);
-            v.hash(state);
-        }
-    }
-}
-
-impl PartialEq for ValueMap {
-    fn eq(&self, other: &Self) -> bool {
-        for k in self.items.keys() {
-            if other.items.contains_key(k) {
-                return true;
-            }
-        }
-        false
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize, Default, Clone, Eq, PartialEq, Hash)]
-pub struct FieldMetadata {
-    name: String,
-    key: String,
-    value_map: ValueMap,
-    type_id: usize,
-    description: String,
-}
-
-impl FieldMetadata {
-    pub fn new(name: &str, key: &str, values: Vec<Bytes>, description: &str) -> Self {
-        Self {
-            name: name.to_string(),
-            key: key.to_string(),
-            value_map: ValueMap::from_values(values),
-            type_id: type_id(key),
-            description: description.to_string(),
-        }
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize, Default, Clone, Eq)]
-pub struct KeyMetadata {
-    field_meta: HashMap<String, FieldMetadata>,
-    type_id: usize,
-}
-
-impl Hash for KeyMetadata {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.type_id.hash(state);
-        for (k, v) in self.field_meta.iter() {
-            k.hash(state);
-            v.hash(state);
-        }
-    }
-}
-
-impl PartialEq for KeyMetadata {
-    fn eq(&self, other: &Self) -> bool {
-        self.type_id == other.type_id
-    }
-}
-
-impl KeyMetadata {
-    pub fn new() -> Self {
-        Self {
-            type_id: 0,
-            field_meta: HashMap::default(),
-        }
-    }
-
-    pub fn as_bytes(&self) -> BotnetResult<Bytes> {
-        Ok(Bytes::from(bincode::serialize(&self)?))
-    }
-
-    pub fn field(&mut self, f: FieldMetadata) -> &mut Self {
-        self.field_meta.insert(f.name.clone(), f);
-        self
-    }
-
-    pub fn build(&self) -> Self {
-        self.clone()
-    }
-
-    pub fn with_key_code(meta: Self, type_id: usize) -> Self {
-        Self {
-            field_meta: meta.field_meta,
-            type_id,
-        }
-    }
-
-    pub fn from<I>(type_id: usize, value: I) -> Self
-    where
-        I: Iterator<Item = FieldMetadata>,
-    {
-        let mut field_meta = HashMap::new();
-        for f in value {
-            field_meta.insert(f.name.clone(), f);
-        }
-
-        Self {
-            type_id,
-            field_meta,
-        }
-    }
-}
-
-#[derive(Debug, Default, Serialize, Deserialize, Clone, Eq, PartialEq, Hash)]
-pub struct Field {
-    pub type_id: usize,
-    pub field_name: String,
-    pub value: Bytes,
-}
-
-impl Field {
-    pub fn new(field_name: &str, value: Bytes) -> Self {
-        Self {
-            type_id: type_id(field_name),
-            field_name: field_name.to_string(),
-            value,
-        }
-    }
-}
-
-pub trait Key {
-    fn flatten(&self) -> Bytes;
-    fn get_metadata(&self) -> KeyMetadata;
-    fn type_id(&self) -> usize;
-    fn name(&self) -> &'static str;
-}
-
-#[derive(Clone)]
-pub struct Extractor {
-    #[allow(unused)]
-    key: String,
-    func: ExtractorFn,
-}
-
-impl Default for Extractor {
-    fn default() -> Self {
-        fn default_func(_input: &Input) -> BotnetResult<Field> {
-            Ok(Field::default())
-        }
-
-        Self {
-            key: String::default(),
-            func: default_func,
-        }
-    }
-}
-
-impl Extractor {
-    pub fn new(key: &str, func: ExtractorFn) -> Self {
-        Self {
-            key: key.to_string(),
-            func,
-        }
-    }
-
-    pub fn call(&self, input: &Input) -> BotnetResult<Field> {
-        (self.func)(input)
-    }
-}
-
-#[derive(Default, Clone)]
-pub struct KeyExtractors {
-    pub items: HashMap<String, Extractor>,
-}
-
-impl KeyExtractors {
-    pub fn new() -> Self {
-        Self {
-            items: HashMap::default(),
-        }
-    }
-
-    pub fn add(&mut self, key: &str, value: ExtractorFn) {
-        self.items
-            .insert(key.to_string(), Extractor::new(key, value));
-    }
-
-    pub fn from<'a, I>(value: I) -> Self
-    where
-        I: Iterator<Item = (&'a str, ExtractorFn)>,
-    {
-        let mut items = HashMap::new();
-        for (k, f) in value {
-            items.insert(k.to_string(), Extractor::new(k, f));
-        }
-
-        Self { items }
-    }
-}
-
-#[derive(Default, Clone)]
-pub struct Metadata {
-    items: HashMap<usize, KeyMetadata>,
-}
-
-impl Metadata {
-    pub fn new() -> Self {
-        Self {
-            items: HashMap::default(),
-        }
-    }
-
-    pub fn insert(&mut self, ty_id: usize, meta: KeyMetadata) {
-        self.items.insert(ty_id, meta);
-    }
-
-    pub fn get(&self, ty_id: &usize) -> &KeyMetadata {
-        self.items.get(ty_id).unwrap()
-    }
-
-    pub fn from<I>(value: I) -> Self
-    where
-        I: Iterator<Item = (usize, KeyMetadata)>,
-    {
-        let mut items = HashMap::new();
-        for (k, f) in value {
-            items.insert(k, f);
-        }
-
-        Self { items }
-    }
-}
-
-#[derive(Default, Clone)]
-pub struct Extractors {
-    items: HashMap<usize, KeyExtractors>,
-}
-
-impl Extractors {
-    pub fn new() -> Self {
-        Self {
-            items: HashMap::default(),
-        }
-    }
-
-    pub fn insert(&mut self, ty_id: usize, exts: KeyExtractors) {
-        self.items.insert(ty_id, exts);
-    }
-
-    pub fn get(&self, ty_id: &usize) -> &KeyExtractors {
-        self.items.get(ty_id).unwrap()
-    }
-
-    pub fn from<I>(value: I) -> Self
-    where
-        I: Iterator<Item = (usize, KeyExtractors)>,
-    {
-        let mut items = HashMap::new();
-        for (k, f) in value {
-            items.insert(k, f);
-        }
-
-        Self { items }
-    }
-}
-
-#[macro_export]
-macro_rules! botnet_key {
-    ($name: ident) => {
-        use botnet_macros::key;
-
-        #[key]
-        pub struct $name {
-            fields: Vec<Field>,
-            metadata: KeyMetadata,
-        }
-    };
 }
