@@ -6,3 +6,15 @@ members = [
     "packages/botnet-macros",
     "packages/botnet-utils"
 ]
+
+[workspace.package]
+authors = ["ra0x3 <ra0x3@pm.me>"]
+edition = "2021"
+homepage = "https://rashad.wiki"
+license = "Apache-2.0"
+repository = "https://github.com/ra0x3/botnet"
+rust-version = "1.71.0"
+version = "0.2.0"
+
+[workspace.dependencies]
+nom = { version = "7.1" }

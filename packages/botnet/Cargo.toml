@@ -1,11 +1,13 @@
 [package]
 name = "botnet"
-version = "0.2.0"
-edition = "2021"
-license = "BUSL-1.1"
-repository = "https://github.com/ra0x3/botnet"
-description = "botnet"
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+description = "Botnet middleware."
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+version = { workspace = true }
 
 [[bin]]
 name = "botnet"
@@ -27,7 +29,7 @@ bytes = { version = "1.3", features = ["serde"], optional = true }
 clap = { version = "4.2", features = ["derive"], optional = true }
 futures-util = "0.3"
 lazy_static = "1.4"
-nom = { version = "5.1", optional = true }
+nom = { workspace = true, optional = true }
 serde = { version = "1.0", features = ["derive"], optional = true }
 serde_json = { version = "1.0", optional = true }
 thiserror = { version = "1.0", optional = true }
