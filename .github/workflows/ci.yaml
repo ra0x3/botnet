@@ -11,7 +11,7 @@ env:
   DASEL_VERSION: https://github.com/TomWright/dasel/releases/download/v1.24.3/dasel_linux_amd64
   CARGO_TERM_COLOR: always
   RUSTFLAGS: -D warnings
-  RUSTC_VERSION: 1.68
+  RUSTC_VERSION: 1.71
   REGISTRY: ghcr.io
   BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
   IS_RELEASE: github.event_name == 'release' && github.event.action == 'published'
