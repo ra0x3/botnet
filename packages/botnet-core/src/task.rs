@@ -1,4 +1,4 @@
-/// A collection of utilities in anomaly detection tasks.
+/// Utilities used in anomaly detection tasks.
 use crate::{database::Database, BotnetKey, BotnetParams, BotnetResult};
 use bytes::{Buf, Bytes};
 
@@ -17,28 +17,28 @@ impl Strategy {
 
     /// Return whether or not the `entity_counting` strategy is enabled.
     pub fn entity_counting_enabled(&self) -> bool {
-        self.params.config.strategy.entity.enabled
+        self.params.config().strategy().entity().enabled()
     }
 
     /// Return whether or not the `kanon` strategy is enabled.
     pub fn kanon_enabled(&self) -> bool {
-        self.params.config.strategy.kanon.enabled
+        self.params.config().strategy().kanon().enabled()
     }
 
     /// Count this entity in the stratey.
     pub fn count_entity(&self, k: &BotnetKey) -> BotnetResult<u64> {
-        let mut db = self.params.db.clone().expect("Database expected.");
+        let mut db = self.params.db().expect("Database expected.");
         db.incr_key(k)
     }
 
     /// Return whether or not the entity is k-anonymous.
     pub fn is_k_anonymous(&self, k: &BotnetKey) -> BotnetResult<bool> {
-        let db = self.params.db.clone().expect("Database expected.");
+        let db = self.params.db().expect("Database expected.");
         let mut v = db
             .get_key(k)?
             .unwrap_or(Bytes::from(0u64.to_le_bytes().to_vec()));
         let v = v.get_u64_le();
-        let k = self.params.config.strategy.kanon.k.k();
+        let k = self.params.config().strategy().kanon().k();
         Ok(v >= k)
     }
 

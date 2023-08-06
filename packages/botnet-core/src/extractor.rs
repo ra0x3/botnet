@@ -1,4 +1,4 @@
-/// A collection of utilities in anomaly detection evaluation.
+/// Utilities used in anomaly detection feature extraction.
 use crate::{BotnetResult, Field, Input, Url};
 use std::collections::HashMap;
 

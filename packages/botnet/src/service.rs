@@ -10,7 +10,11 @@ use std::{
 use tower::{Layer, Service};
 
 lazy_static! {
+
+    /// Default set of field extractors to be used in botnet middleware.
     pub static ref FIELD_EXTRACTORS: FieldExtractors = FieldExtractors::default();
+
+    /// Default set of key metadata to be used in botnet middleware.
     pub static ref KEY_METADATA: BotnetKeyMetadata = BotnetKeyMetadata::default();
 }
 
@@ -23,23 +27,8 @@ struct BotnetState {
 
 impl From<BotnetParams> for BotnetState {
     /// Create a new `BotnetState` from `BotnetParams`.
-    fn from(val: BotnetParams) -> Self {
-        let BotnetParams {
-            keys,
-            metadata,
-            extractors,
-            db,
-            config,
-        } = val;
-        Self {
-            params: BotnetParams {
-                keys,
-                metadata,
-                extractors,
-                db,
-                config,
-            },
-        }
+    fn from(params: BotnetParams) -> Self {
+        Self { params }
     }
 }
 
@@ -99,27 +88,19 @@ where
         let input: Input = req.uri().into();
 
         let botnet = Botnet::default();
+        let extractors = self.state.params.extractors();
+        let metadata = self.state.params.metadata();
 
         let keys = self
             .state
             .params
-            .config
+            .config()
             .keys()
             .iter()
             .map(|k| {
                 let ty_id = type_id(k.name());
-                let exts = self
-                    .state
-                    .params
-                    .extractors
-                    .get(&ty_id)
-                    .unwrap_or(&FIELD_EXTRACTORS);
-                let meta = self
-                    .state
-                    .params
-                    .metadata
-                    .get(&ty_id)
-                    .unwrap_or(&KEY_METADATA);
+                let exts = extractors.get(&ty_id).unwrap_or(&FIELD_EXTRACTORS);
+                let meta = metadata.get(&ty_id).unwrap_or(&KEY_METADATA);
 
                 BotnetKey::from_input(&input, exts, meta).unwrap_or_default()
             })

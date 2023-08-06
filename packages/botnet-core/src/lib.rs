@@ -1,14 +1,23 @@
 #![deny(unused_crate_dependencies)]
 
-/// Botnet core lib.
-
 #[macro_use]
 
+/// A collection of anomaly detection compatible NoSQL databases.
 pub mod database;
+
+/// Botnet configuration.
 pub mod config;
+
+/// Utilities used in anomaly detection evaluation.
 pub mod eval;
+
+/// Utilities used in anomaly detection feature extraction.
 pub mod extractor;
+
+/// A collection of models used used in anomaly detection evaluation.
 pub mod models;
+
+/// Utilities used in anomaly detection tasks.
 pub mod task;
 
 pub use crate::{
@@ -22,7 +31,6 @@ pub use nom::AsBytes;
 pub use serde_json::Value as SerdeValue;
 pub use url::Url;
 
-use http::Uri;
 use std::{fmt::Debug, io::Error as IoError, sync::PoisonError};
 use thiserror::Error;
 use tokio::task::JoinError;
@@ -80,33 +88,5 @@ impl<T> From<PoisonError<T>> for BotnetError {
     /// Return a `BotnetError` from a `PoisonError`.
     fn from(_e: PoisonError<T>) -> Self {
         Self::PoisonError
-    }
-}
-
-impl AsRef<str> for Input {
-    /// Return the input as a string.
-    fn as_ref(&self) -> &str {
-        std::str::from_utf8(self.0.as_bytes()).expect("Bad input.")
-    }
-}
-
-impl From<&'static str> for Input {
-    /// Create a new input from a string.
-    fn from(value: &'static str) -> Self {
-        Self::new(value)
-    }
-}
-
-impl From<String> for Input {
-    /// Create a new input from a string.
-    fn from(value: String) -> Self {
-        Self(Bytes::from(value))
-    }
-}
-
-impl From<&Uri> for Input {
-    /// Create a new input from a string.
-    fn from(value: &Uri) -> Self {
-        Input::from(value.to_string())
     }
 }

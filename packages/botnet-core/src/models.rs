@@ -1,11 +1,12 @@
-/// A collection of models used in anomaly detection evaluation.
+/// A collection of models used used in anomaly detection evaluation.
 pub use crate::{
     config::{BotnetConfig, DbType, Field as ConfigField, Key as ConfigKey},
     database::{Database, InMemory},
-    BotnetError, BotnetResult, ExtractorFn,
+    AsBytes, BotnetError, BotnetResult, ExtractorFn,
 };
 use botnet_utils::type_id;
 use bytes::Bytes;
+use http::Uri;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
@@ -16,12 +17,40 @@ use std::{
 };
 
 /// Basic botnet input type for middleware operations.
-pub struct Input(pub Bytes);
+pub struct Input(Bytes);
 
-impl Input {
+impl From<&'static str> for Input {
     /// Create a new `Input` from a byte slice.
-    pub fn new(s: &'static str) -> Self {
-        Self(Bytes::from(s.as_bytes()))
+    fn from(val: &'static str) -> Self {
+        Self(Bytes::from(val.as_bytes()))
+    }
+}
+
+impl AsBytes for Input {
+    /// Get the bytes of an `Input`.
+    fn as_bytes(&self) -> &[u8] {
+        self.0.as_ref()
+    }
+}
+
+impl AsRef<str> for Input {
+    /// Return the input as a string.
+    fn as_ref(&self) -> &str {
+        std::str::from_utf8(self.as_bytes()).expect("Bad input.")
+    }
+}
+
+impl From<String> for Input {
+    /// Create a new input from a string.
+    fn from(value: String) -> Self {
+        Self(Bytes::from(value))
+    }
+}
+
+impl From<&Uri> for Input {
+    /// Create a new input from a string.
+    fn from(value: &Uri) -> Self {
+        Input::from(value.to_string())
     }
 }
 
@@ -64,8 +93,8 @@ pub struct BotnetKeyMetadata {
 impl From<&ConfigKey> for BotnetKey {
     /// Create a new `BotnetKey` from a `ConfigKey`.
     fn from(val: &ConfigKey) -> Self {
-        let metadata = BotnetKeyMetadata::new(&val.name);
-        let fields = val.fields.iter().map(Field::from).collect::<Vec<Field>>();
+        let metadata = BotnetKeyMetadata::new(val.name());
+        let fields = val.fields().iter().map(Field::from).collect::<Vec<Field>>();
         Self { metadata, fields }
     }
 }
@@ -131,22 +160,22 @@ impl BotnetKeyMetadata {
 #[derive(Debug, Default, Serialize, Deserialize, Clone, Eq, PartialEq, Hash)]
 pub struct Field {
     /// Type id of the field.
-    pub type_id: usize,
+    type_id: usize,
 
     /// Name of the field.
-    pub name: String,
+    name: String,
 
     /// Value of the field.
-    pub value: Bytes,
+    value: Bytes,
 
     /// Metadata of the field.
-    pub meta: FieldMetadata,
+    meta: FieldMetadata,
 }
 
 impl From<&ConfigField> for Field {
     /// Create a new `Field` from a `ConfigField`.
     fn from(val: &ConfigField) -> Self {
-        Self::new(&val.name, &val.key, &val.description)
+        Self::new(val.name(), val.key(), val.description())
     }
 }
 
@@ -322,7 +351,7 @@ impl Extractors {
     }
 }
 
-/// The primary abstraction used in anomaly detection.
+/// The primary abstraction used used in anomaly detection.
 ///
 /// A `BotnetKey` is constructed from a set of `Field`s, which are extracted from an `Input` using
 /// a set of `Extractor`s.
@@ -367,6 +396,11 @@ impl BotnetKey {
         self.metadata.name.clone()
     }
 
+    /// A set of `Field`s extracted from the `BotnetKey`.
+    pub fn fields(&self) -> Vec<Field> {
+        self.fields.clone()
+    }
+
     /// Create a `BotnetKey` from an `Input`, set of `FieldExtractors`, and `BotnetKeyMetadata`.
     pub fn from_input(
         value: &Input,
@@ -407,31 +441,31 @@ impl BotnetKey {
 #[derive(Clone, Default, Debug)]
 pub struct BotnetParams {
     /// Botnet keys.
-    pub keys: Arc<HashMap<usize, BotnetKey>>,
+    keys: Arc<HashMap<usize, BotnetKey>>,
 
     /// Botnet metadata.
-    pub metadata: Arc<Metadata>,
+    metadata: Arc<Metadata>,
 
     /// Botnet extractors.
-    pub extractors: Arc<Extractors>,
+    extractors: Arc<Extractors>,
 
     /// Botnet database.
-    pub db: Option<InMemory>,
+    db: Option<InMemory>,
 
     /// Botnet configuration.
-    pub config: Arc<BotnetConfig>,
+    config: Arc<BotnetConfig>,
 }
 
 impl From<BotnetConfig> for BotnetParams {
     /// Create a new `BotnetParams` from a `BotnetConfig`.
     fn from(val: BotnetConfig) -> Self {
-        let db = match val.database.db_type {
+        let db = match val.database().db_type() {
             DbType::InMemory => InMemory::new(),
             _ => unimplemented!(),
         };
 
         let keys: HashMap<usize, BotnetKey> = HashMap::from_iter(
-            val.keys.iter().map(|k| (k.type_id(), BotnetKey::from(k))),
+            val.keys().iter().map(|k| (k.type_id(), BotnetKey::from(k))),
         );
 
         Self {
@@ -459,6 +493,31 @@ impl BotnetParams {
             db,
             config: Arc::new(config),
         }
+    }
+
+    /// Return the set of `BotnetKey`s associated with these `BotnetParams`.
+    pub fn keys(&self) -> Arc<HashMap<usize, BotnetKey>> {
+        self.keys.clone()
+    }
+
+    /// Return the set of `Metadata`s associated with these `BotnetParams`.
+    pub fn metadata(&self) -> Arc<Metadata> {
+        self.metadata.clone()
+    }
+
+    /// Return the `Database` associated with these `BotnetParams`.
+    pub fn db(&self) -> Option<InMemory> {
+        self.db.clone()
+    }
+
+    /// Return the `BotnetConfig` associated with these `BotnetParams`.
+    pub fn config(&self) -> Arc<BotnetConfig> {
+        self.config.clone()
+    }
+
+    /// Return the `Extractors` associated with these `BotnetParams`.
+    pub fn extractors(&self) -> Arc<Extractors> {
+        self.extractors.clone()
     }
 }
 

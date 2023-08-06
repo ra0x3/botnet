@@ -1,4 +1,4 @@
-/// A collection of utilities in anomaly detection evaluation.
+/// Utilities used in anomaly detection evaluation.
 use crate::prelude::*;
 use async_trait::async_trait;
 use serde_json::Value;

@@ -80,23 +80,40 @@ pub enum Version {
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct Field {
     /// Name of the field.
-    pub name: String,
+    name: String,
 
     /// Key/identifier of the field.
-    pub key: String,
+    key: String,
 
     /// Description of the field.
-    pub description: String,
+    description: String,
+}
+
+impl Field {
+    /// Name of the field.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Key/identifier of the field.
+    pub fn key(&self) -> &str {
+        &self.key
+    }
+
+    /// Description of the field.
+    pub fn description(&self) -> &str {
+        &self.description
+    }
 }
 
 /// Botnet `Key` configuration.
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct Key {
     /// Name of the key.
-    pub name: String,
+    name: String,
 
-    /// Description of the key.
-    pub fields: Vec<Field>,
+    /// Fields associated with this `Key`.
+    fields: Vec<Field>,
 }
 
 impl Key {
@@ -109,49 +126,107 @@ impl Key {
     pub fn type_id(&self) -> usize {
         type_id(self.name.as_bytes())
     }
+
+    /// Fields associated with this `Key`.
+    pub fn fields(&self) -> &Vec<Field> {
+        &self.fields
+    }
 }
 
 /// Botnet K-Anon configuration.
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct KAnon {
     /// K-Anonimity level.
-    pub k: KAnonimity,
+    k: KAnonimity,
 
     /// K-Anonimity enabled.
-    pub enabled: bool,
+    enabled: bool,
+}
+
+impl KAnon {
+    /// K-Anonimity level.
+    pub fn k(&self) -> u64 {
+        self.k.k()
+    }
+
+    /// K-Anonimity enabled.
+    pub fn enabled(&self) -> bool {
+        self.enabled
+    }
 }
 
 /// Botnet entity counting configuration.
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct EntityCounter {
     /// Entity counting enabled.
-    pub enabled: bool,
+    enabled: bool,
 
     /// Entity class.
-    pub counter: EntityClass,
+    counter: EntityClass,
+}
+
+impl EntityCounter {
+    /// Entity counting enabled.
+    pub fn enabled(&self) -> bool {
+        self.enabled
+    }
+
+    /// Entity class.
+    pub fn counter(&self) -> &EntityClass {
+        &self.counter
+    }
 }
 
 /// Botnet cliff detection configuration.
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct CliffDetection {
     /// Cliff detection enabled.
-    pub enabled: bool,
+    enabled: bool,
 
     /// Cliff detector.
-    pub detector: CliffDetector,
+    detector: CliffDetector,
+}
+
+impl CliffDetection {
+    /// Cliff detection enabled.
+    pub fn enabled(&self) -> bool {
+        self.enabled
+    }
+
+    /// Cliff detector.
+    pub fn detector(&self) -> &CliffDetector {
+        &self.detector
+    }
 }
 
 /// Botnet strategy configuration.
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct Strategy {
     /// Entity counting configuration.
-    pub entity: EntityCounter,
+    entity: EntityCounter,
 
     /// K-Anon configuration.
-    pub kanon: KAnon,
+    kanon: KAnon,
 
     /// Cliff detection configuration.
-    pub cliff: CliffDetection,
+    cliff: CliffDetection,
+}
+
+impl Strategy {
+    /// Entity counting configuration.
+    pub fn entity(&self) -> &EntityCounter {
+        &self.entity
+    }
+
+    /// K-Anon configuration.
+    pub fn kanon(&self) -> &KAnon {
+        &self.kanon
+    }
+
+    /// Cliff detection configuration.
+    pub fn cliff(&self) -> &CliffDetection {
+        &self.cliff
+    }
 }
 
 /// Botnet database type configuration.
@@ -170,26 +245,38 @@ pub enum DbType {
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct Database {
     /// Database type.
-    pub db_type: DbType,
+    db_type: DbType,
 
     /// Database URI.
-    pub uri: Option<String>,
+    uri: Option<String>,
+}
+
+impl Database {
+    /// Database type.
+    pub fn db_type(&self) -> &DbType {
+        &self.db_type
+    }
+
+    /// Database URI.
+    pub fn uri(&self) -> Option<&String> {
+        self.uri.as_ref()
+    }
 }
 
 /// Botnet configuration.
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct BotnetConfig {
     /// Botnet config version.
-    pub version: Version,
+    version: Version,
 
     /// Botnet config strategy.
-    pub strategy: Strategy,
+    strategy: Strategy,
 
     /// Botnet config keys.
-    pub keys: Vec<Key>,
+    keys: Vec<Key>,
 
     /// Database configuration.
-    pub database: Database,
+    database: Database,
 }
 
 impl BotnetConfig {
@@ -208,5 +295,15 @@ impl BotnetConfig {
     /// Get the keys for this configuration.
     pub fn keys(&self) -> &Vec<Key> {
         &self.keys
+    }
+
+    /// Get the strategy for this configuration.
+    pub fn strategy(&self) -> &Strategy {
+        &self.strategy
+    }
+
+    /// Get the database for this configuration.
+    pub fn database(&self) -> &Database {
+        &self.database
     }
 }

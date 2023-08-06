@@ -1,5 +1,3 @@
-/// Botnet lib.
-
 /// Botnet middleware service utils.
 pub mod service;
 
