@@ -1,5 +1,6 @@
 /// Utilities used in anomaly detection tasks.
-use crate::{database::Database, BotnetKey, BotnetParams, BotnetResult};
+use crate::database::Database;
+use crate::models::*;
 use bytes::{Buf, Bytes};
 
 /// Create a new strategy with which to run anomaly detection.

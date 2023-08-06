@@ -1,6 +1,7 @@
 /// Utilities used in anomaly detection feature extraction.
-use crate::{BotnetResult, Field, Input, Url};
+use crate::models::*;
 use std::collections::HashMap;
+use url::Url;
 
 /// Used to ensure all extractor logic conforms to a unified interface.
 pub trait Extractor {

@@ -20,12 +20,6 @@ pub mod models;
 /// Utilities used in anomaly detection tasks.
 pub mod task;
 
-pub use crate::{
-    config::{BotnetConfig, DbType, Field as ConfigField, Key as ConfigKey},
-    database::{Database, InMemory},
-    extractor::*,
-    models::*,
-};
 pub use bytes::Bytes;
 pub use nom::AsBytes;
 pub use serde_json::Value as SerdeValue;
@@ -34,6 +28,8 @@ pub use url::Url;
 use std::{fmt::Debug, io::Error as IoError, sync::PoisonError};
 use thiserror::Error;
 use tokio::task::JoinError;
+
+use crate::models::{Field, Input};
 
 /// Result type for used in botnet core operations.
 pub type BotnetResult<T> = Result<T, BotnetError>;
@@ -44,19 +40,19 @@ pub type ExtractorFn = fn(&Input) -> BotnetResult<Field>;
 /// `botnet_core` module prelude.
 pub mod prelude {
 
-    /// Re-exports all `botnet_core` exports.
-    pub use super::*;
+    /// Re-exports all `botnet_core` models.
+    pub use super::models::*;
 
-    /// Re-exports `crate::database::{Database, InMemory}`.
-    pub use crate::database::{Database, InMemory};
+    /// Re-exports all `botnet_core` database utils.
+    pub use crate::database::*;
 
-    /// Re-exports `crate::config::BotnetConfig`.
+    /// Re-exports `BotnetConfig`.
     pub use crate::config::BotnetConfig;
 
-    /// Re-exports `crate::eval::Evaluator`.
+    /// Re-exports botnet evaluators.
     pub use crate::eval::Evaluator;
 
-    /// Re-exports `crate::task::Strategy`.
+    /// Re-exports botnet strategies.
     pub use crate::task::Strategy;
 }
 

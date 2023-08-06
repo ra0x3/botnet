@@ -1,5 +1,6 @@
 /// A collection of anomaly detection compatible NoSQL databases.
-use crate::{BotnetKey, BotnetResult, Bytes};
+use crate::models::*;
+use crate::Bytes;
 use async_trait::async_trait;
 use bytes::Buf;
 use std::{
