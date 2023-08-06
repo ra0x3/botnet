@@ -1,6 +1,5 @@
-use axum::http::Method;
-use axum::{routing::get, Router};
-use botnet::{core::config::BotnetConfig, prelude::*, service::BotnetMiddleware};
+use axum::{http::Method, routing::get, Router};
+use botnet::{prelude::*, service::BotnetMiddleware};
 use clap::Parser;
 use std::{net::SocketAddr, path::PathBuf};
 use tower_http::{
@@ -24,20 +23,6 @@ pub mod user_lib {
 
     const RUST_LOG: &str = "RUST_LOG";
     const HUMAN_LOGGING: &str = "HUMAN_LOGGING";
-
-    pub mod extractors {
-
-        use botnet::core::{BotnetResult, Field, Input, Url};
-        use std::collections::HashMap;
-
-        pub fn extract_ssl_param(input: &Input) -> BotnetResult<Field> {
-            let key = "ssl";
-            let url = Url::parse(input.as_ref())?;
-            let params: HashMap<_, _> = url.query_pairs().into_owned().collect();
-            let value = params.get(key).unwrap().to_owned();
-            Ok(Field::new(key, &value, ""))
-        }
-    }
 
     pub mod web {
         pub async fn root() -> &'static str {

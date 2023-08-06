@@ -1,3 +1,4 @@
+/// Botnet middleware services.
 use crate::{prelude::*, utils::type_id};
 use axum::{body::Body, http::Request, response::Response};
 use futures_util::future::BoxFuture;
@@ -13,12 +14,15 @@ lazy_static! {
     pub static ref KEY_METADATA: BotnetKeyMetadata = BotnetKeyMetadata::default();
 }
 
+/// Botnet middleware params.
 #[derive(Clone)]
 struct BotnetState {
+    /// Botnet params.
     params: BotnetParams,
 }
 
 impl From<BotnetParams> for BotnetState {
+    /// Create a new `BotnetState` from `BotnetParams`.
     fn from(val: BotnetParams) -> Self {
         let BotnetParams {
             keys,
@@ -39,12 +43,15 @@ impl From<BotnetParams> for BotnetState {
     }
 }
 
+/// Botnet middleware.
 #[derive(Clone)]
 pub struct BotnetMiddleware {
+    /// Botnet state.
     state: BotnetState,
 }
 
 impl From<BotnetParams> for BotnetMiddleware {
+    /// Create a new `BotnetMiddleware` from `BotnetParams`.
     fn from(val: BotnetParams) -> Self {
         let state: BotnetState = val.into();
         Self { state }
@@ -54,6 +61,7 @@ impl From<BotnetParams> for BotnetMiddleware {
 impl<S> Layer<S> for BotnetMiddleware {
     type Service = BotnetService<S>;
 
+    /// Wrap the inner service with the botnet middleware.
     fn layer(&self, inner: S) -> Self::Service {
         BotnetService {
             inner,
@@ -62,9 +70,13 @@ impl<S> Layer<S> for BotnetMiddleware {
     }
 }
 
+/// Botnet middleware service.
 #[derive(Clone)]
 pub struct BotnetService<S> {
+    /// Inner service.
     inner: S,
+
+    /// Botnet state.
     state: BotnetState,
 }
 
@@ -77,10 +89,12 @@ where
     type Error = S::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
+    /// Poll the inner service.
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.inner.poll_ready(cx)
     }
 
+    /// Call the inner service.
     fn call(&mut self, mut req: Request<Body>) -> Self::Future {
         let input: Input = req.uri().into();
 
@@ -113,27 +127,18 @@ where
 
         let strategy = Rc::new(Strategy::new(self.state.params.clone()));
 
-        let _counts = keys
+        let _results = keys
             .iter()
-            .filter_map(|k| {
+            .map(|k| {
                 if strategy.entity_counting_enabled() {
-                    Some(strategy.count_entity(k).unwrap())
-                } else {
-                    None
+                    strategy.count_entity(k).unwrap();
                 }
-            })
-            .collect::<Vec<u64>>();
 
-        let _kanons = keys
-            .iter()
-            .filter_map(|k| {
                 if strategy.kanon_enabled() {
-                    Some(strategy.is_k_anonymous(k).unwrap())
-                } else {
-                    None
+                    strategy.is_k_anonymous(k).unwrap();
                 }
             })
-            .collect::<Vec<bool>>();
+            .collect::<Vec<()>>();
 
         req.extensions_mut().insert(botnet);
 

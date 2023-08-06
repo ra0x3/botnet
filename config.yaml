@@ -18,3 +18,7 @@ keys:
 database:
   db_type: in_memory
   uri: ~
+extractors:
+  - key: ssl
+    extractor: extract_url_param
+    

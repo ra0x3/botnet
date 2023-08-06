@@ -1,5 +1,6 @@
 #![deny(unused_crate_dependencies)]
 
+/// A collection of utilities in anomaly detection.
 use nom::AsBytes;
 
 pub fn type_id(k: impl AsBytes) -> usize {

@@ -1,3 +1,4 @@
+/// A collection of models used in anomaly detection evaluation.
 pub use crate::{
     config::{BotnetConfig, DbType, Field as ConfigField, Key as ConfigKey},
     database::{Database, InMemory},
@@ -14,23 +15,34 @@ use std::{
     sync::Arc,
 };
 
+/// Basic botnet input type for middleware operations.
 pub struct Input(pub Bytes);
 
 impl Input {
+    /// Create a new `Input` from a byte slice.
     pub fn new(s: &'static str) -> Self {
         Self(Bytes::from(s.as_bytes()))
     }
 }
 
+/// Metadata related to a `Field` on a `BotnetKey`.
 #[derive(Debug, Serialize, Deserialize, Default, Clone, Eq, PartialEq, Hash)]
 pub struct FieldMetadata {
+    /// Name of the field.
     name: String,
+
+    /// Key/identifier of the field.
     key: String,
+
+    /// Type id of the field.
     type_id: usize,
+
+    /// Description of the field.
     description: String,
 }
 
 impl FieldMetadata {
+    /// Create a new `FieldMetadata`.
     pub fn new(name: &str, key: &str, description: &str) -> Self {
         Self {
             name: name.to_string(),
@@ -41,6 +53,7 @@ impl FieldMetadata {
     }
 }
 
+/// Metadata related to a `BotnetKey`.
 #[derive(Debug, Serialize, Deserialize, Default, Clone, Eq)]
 pub struct BotnetKeyMetadata {
     field_meta: HashMap<String, FieldMetadata>,
@@ -49,6 +62,7 @@ pub struct BotnetKeyMetadata {
 }
 
 impl From<&ConfigKey> for BotnetKey {
+    /// Create a new `BotnetKey` from a `ConfigKey`.
     fn from(val: &ConfigKey) -> Self {
         let metadata = BotnetKeyMetadata::new(&val.name);
         let fields = val.fields.iter().map(Field::from).collect::<Vec<Field>>();
@@ -57,6 +71,7 @@ impl From<&ConfigKey> for BotnetKey {
 }
 
 impl Hash for BotnetKeyMetadata {
+    /// Hash a `BotnetKeyMetadata`.
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.type_id.hash(state);
         for (k, v) in self.field_meta.iter() {
@@ -67,18 +82,21 @@ impl Hash for BotnetKeyMetadata {
 }
 
 impl PartialEq for BotnetKeyMetadata {
+    /// Compare two `BotnetKeyMetadata`s.
     fn eq(&self, other: &Self) -> bool {
         self.type_id == other.type_id
     }
 }
 
 impl From<BotnetKeyMetadata> for Bytes {
+    /// Serialize a `BotnetKeyMetadata` to bytes.
     fn from(val: BotnetKeyMetadata) -> Self {
         Bytes::from(bincode::serialize(&val).expect("Bad serialization."))
     }
 }
 
 impl BotnetKeyMetadata {
+    /// Create a new `BotnetKeyMetadata`.
     pub fn new(name: &str) -> Self {
         Self {
             type_id: type_id(name),
@@ -87,6 +105,7 @@ impl BotnetKeyMetadata {
         }
     }
 
+    /// Create a new `BotnetKeyMetadata` from a type, name, and iterator of `FieldMetadata`.    
     pub fn from<I>(type_id: usize, name: &str, value: I) -> Self
     where
         I: Iterator<Item = FieldMetadata>,
@@ -102,26 +121,37 @@ impl BotnetKeyMetadata {
         }
     }
 
+    /// Get the type id of the `BotnetKeyMetadata`.
     pub fn type_id(&self) -> usize {
         self.type_id
     }
 }
 
+/// A `Field` on a `BotnetKey`.
 #[derive(Debug, Default, Serialize, Deserialize, Clone, Eq, PartialEq, Hash)]
 pub struct Field {
+    /// Type id of the field.
     pub type_id: usize,
+
+    /// Name of the field.
     pub name: String,
+
+    /// Value of the field.
     pub value: Bytes,
+
+    /// Metadata of the field.
     pub meta: FieldMetadata,
 }
 
 impl From<&ConfigField> for Field {
+    /// Create a new `Field` from a `ConfigField`.
     fn from(val: &ConfigField) -> Self {
         Self::new(&val.name, &val.key, &val.description)
     }
 }
 
 impl Field {
+    /// Create a new `Field`.
     pub fn new(name: &str, key: &str, description: &str) -> Self {
         Self {
             type_id: type_id(name),
@@ -132,14 +162,19 @@ impl Field {
     }
 }
 
+/// An extraction function used to build `BotnetKey`s. from `Input`s.
 #[derive(Clone)]
 pub struct Extractor {
+    /// Key/identifier of the extractor.
     #[allow(unused)]
     key: String,
+
+    /// Function used to extract a `Field` from an `Input`.
     func: ExtractorFn,
 }
 
 impl Debug for Extractor {
+    /// Debug a `Extractor`.
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("Extractor").finish()?;
         Ok(())
@@ -147,6 +182,7 @@ impl Debug for Extractor {
 }
 
 impl Default for Extractor {
+    /// Create a default `Extractor`.
     fn default() -> Self {
         fn default_func(_input: &Input) -> BotnetResult<Field> {
             Ok(Field::default())
@@ -160,6 +196,7 @@ impl Default for Extractor {
 }
 
 impl Extractor {
+    /// Create a new `Extractor`.
     pub fn new(key: &str, func: ExtractorFn) -> Self {
         Self {
             key: key.to_string(),
@@ -167,28 +204,34 @@ impl Extractor {
         }
     }
 
+    /// Call the `Extractor` on an `Input`.
     pub fn call(&self, input: &Input) -> BotnetResult<Field> {
         (self.func)(input)
     }
 }
 
+/// A collection of `Extractor`s for a set of `Field`s.
 #[derive(Default, Clone, Debug)]
 pub struct FieldExtractors {
+    /// A map of `Extractor`s.
     pub items: HashMap<String, Extractor>,
 }
 
 impl FieldExtractors {
+    /// Create a new `FieldExtractors`.
     pub fn new() -> Self {
         Self {
             items: HashMap::default(),
         }
     }
 
+    /// Add an `Extractor` to the `FieldExtractors`.
     pub fn add(&mut self, key: &str, value: ExtractorFn) {
         self.items
             .insert(key.to_string(), Extractor::new(key, value));
     }
 
+    /// Create a set of `FieldExtractors`s `Extractor` from an iterator of `(&str, ExtractorFn)`.
     pub fn from<'a, I>(value: I) -> Self
     where
         I: Iterator<Item = (&'a str, ExtractorFn)>,
@@ -201,22 +244,27 @@ impl FieldExtractors {
     }
 }
 
+/// A collection of `BotnetKeyMetadata`s.
 #[derive(Default, Clone, Debug)]
 pub struct Metadata {
+    /// A mapping of `BotnetKeyMetadata`s to the type ID for their respective `BotnetKey`s.
     items: HashMap<usize, BotnetKeyMetadata>,
 }
 
 impl Metadata {
+    /// Create a new `Metadata`.
     pub fn new() -> Self {
         Self {
             items: HashMap::default(),
         }
     }
 
+    /// Add a set of `BotnetKeyMetadata` to the `Metadata`.
     pub fn insert(&mut self, ty_id: usize, meta: BotnetKeyMetadata) {
         self.items.insert(ty_id, meta);
     }
 
+    /// Get a set of `BotnetKeyMetadata` from the `Metadata`.
     pub fn get(&self, ty_id: &usize) -> BotnetResult<&BotnetKeyMetadata> {
         self.items.get(ty_id).map_or(
             Err(BotnetError::Error("metadata({ty_id}) not found".into())),
@@ -224,6 +272,7 @@ impl Metadata {
         )
     }
 
+    /// Create a set of `Metadata`s `BotnetKeyMetadata` from an iterator of `(&str, ExtractorFn)`.
     pub fn from<I>(value: I) -> Self
     where
         I: Iterator<Item = (usize, BotnetKeyMetadata)>,
@@ -234,22 +283,27 @@ impl Metadata {
     }
 }
 
+/// A collection of `FieldExtractors`s.
 #[derive(Default, Clone, Debug)]
 pub struct Extractors {
+    /// A mapping of `FieldExtractors`s to the type ID for their respective `BotnetKey`s.
     items: HashMap<usize, FieldExtractors>,
 }
 
 impl Extractors {
+    /// Create new `Extractors`.
     pub fn new() -> Self {
         Self {
             items: HashMap::default(),
         }
     }
 
+    /// Add a  set of `FieldExtractors` to the `Extractors`.
     pub fn insert(&mut self, ty_id: usize, exts: FieldExtractors) {
         self.items.insert(ty_id, exts);
     }
 
+    /// Get a set of `FieldExtractors` from the `Extractors`.
     pub fn get(&self, ty_id: &usize) -> BotnetResult<&FieldExtractors> {
         self.items.get(ty_id).map_or(
             Err(BotnetError::Error("extractor({ty_id}) not found".into())),
@@ -257,6 +311,7 @@ impl Extractors {
         )
     }
 
+    /// Create a set of `Extractors`s `FieldExtractors` from an iterator of `(&str, ExtractorFn)`.
     pub fn from<I>(value: I) -> Self
     where
         I: Iterator<Item = (usize, FieldExtractors)>,
@@ -267,17 +322,26 @@ impl Extractors {
     }
 }
 
+/// The primary abstraction used in anomaly detection.
+///
+/// A `BotnetKey` is constructed from a set of `Field`s, which are extracted from an `Input` using
+/// a set of `Extractor`s.
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Default)]
 pub struct BotnetKey {
+    /// A set of metadata related to the `BotnetKey`.
     metadata: BotnetKeyMetadata,
+
+    /// A set of `Field`s extracted from the `BotnetKey`.
     fields: Vec<Field>,
 }
 
 impl BotnetKey {
+    /// Create a new `BotnetKey`.
     pub fn new(metadata: BotnetKeyMetadata, fields: Vec<Field>) -> Self {
         Self { metadata, fields }
     }
 
+    /// Flatten a `BotnetKey` to bytes.
     pub fn flatten(&self) -> Bytes {
         let fields = Bytes::from(
             self.fields
@@ -293,14 +357,17 @@ impl BotnetKey {
         Bytes::from([id, fields].concat())
     }
 
+    /// Get the type id of the `BotnetKey`.
     pub fn type_id(&self) -> usize {
         self.metadata.type_id()
     }
 
+    /// Get the name of the `BotnetKey`.
     pub fn name(&self) -> String {
         self.metadata.name.clone()
     }
 
+    /// Create a `BotnetKey` from an `Input`, set of `FieldExtractors`, and `BotnetKeyMetadata`.
     pub fn from_input(
         value: &Input,
         extractors: &FieldExtractors,
@@ -319,6 +386,7 @@ impl BotnetKey {
         })
     }
 
+    /// Create a `BotnetKey` from bytes and `BotnetKeyMetadata`.
     pub fn from_bytes(b: Bytes, metadata: &Metadata) -> BotnetResult<BotnetKey> {
         let mut parts = b.chunks_exact(64);
         let mut buff: [u8; 8] = [0u8; 8];
@@ -335,16 +403,27 @@ impl BotnetKey {
     }
 }
 
+/// A set of `Botnet` configuration parameters.
 #[derive(Clone, Default, Debug)]
 pub struct BotnetParams {
+    /// Botnet keys.
     pub keys: Arc<HashMap<usize, BotnetKey>>,
+
+    /// Botnet metadata.
     pub metadata: Arc<Metadata>,
+
+    /// Botnet extractors.
     pub extractors: Arc<Extractors>,
+
+    /// Botnet database.
     pub db: Option<InMemory>,
+
+    /// Botnet configuration.
     pub config: Arc<BotnetConfig>,
 }
 
 impl From<BotnetConfig> for BotnetParams {
+    /// Create a new `BotnetParams` from a `BotnetConfig`.
     fn from(val: BotnetConfig) -> Self {
         let db = match val.database.db_type {
             DbType::InMemory => InMemory::new(),
@@ -365,6 +444,7 @@ impl From<BotnetConfig> for BotnetParams {
 }
 
 impl BotnetParams {
+    /// Create a new `BotnetParams`.
     pub fn new(
         keys: HashMap<usize, BotnetKey>,
         metadata: Metadata,
@@ -382,9 +462,13 @@ impl BotnetParams {
     }
 }
 
+/// A `Botnet` context with its configuration.
 #[derive(Clone, Default)]
 #[allow(unused)]
 pub struct Botnet {
+    /// Whether or not the k-anonimity settings is enabled.
     is_k_anonymous: bool,
+
+    /// Number of entities to count before triggering anomaly detection.
     entity_count: u64,
 }
