@@ -2,32 +2,19 @@
 use crate::{prelude::*, utils::type_id};
 use axum::{body::Body, http::Request, response::Response};
 use futures_util::future::BoxFuture;
-use lazy_static::lazy_static;
-use std::{
-    rc::Rc,
-    task::{Context, Poll},
-};
+use std::task::{Context, Poll};
 use tower::{Layer, Service};
-
-lazy_static! {
-
-    /// Default set of field extractors to be used in botnet middleware.
-    pub static ref FIELD_EXTRACTORS: FieldExtractors = FieldExtractors::default();
-
-    /// Default set of key metadata to be used in botnet middleware.
-    pub static ref KEY_METADATA: BotnetKeyMetadata = BotnetKeyMetadata::default();
-}
 
 /// Botnet middleware params.
 #[derive(Clone)]
 struct BotnetState {
     /// Botnet params.
-    params: BotnetParams,
+    params: BotnetContext,
 }
 
-impl From<BotnetParams> for BotnetState {
-    /// Create a new `BotnetState` from `BotnetParams`.
-    fn from(params: BotnetParams) -> Self {
+impl From<BotnetContext> for BotnetState {
+    /// Create a new `BotnetState` from `BotnetContext`.
+    fn from(params: BotnetContext) -> Self {
         Self { params }
     }
 }
@@ -39,9 +26,9 @@ pub struct BotnetMiddleware {
     state: BotnetState,
 }
 
-impl From<BotnetParams> for BotnetMiddleware {
-    /// Create a new `BotnetMiddleware` from `BotnetParams`.
-    fn from(val: BotnetParams) -> Self {
+impl From<BotnetContext> for BotnetMiddleware {
+    /// Create a new `BotnetMiddleware` from `BotnetContext`.
+    fn from(val: BotnetContext) -> Self {
         let state: BotnetState = val.into();
         Self { state }
     }
@@ -87,41 +74,26 @@ where
     fn call(&mut self, mut req: Request<Body>) -> Self::Future {
         let input: Input = req.uri().into();
 
-        let botnet = Botnet::default();
+        let context = BotnetContext::default();
         let extractors = self.state.params.extractors();
         let metadata = self.state.params.metadata();
 
-        let keys = self
+        let _keys = self
             .state
             .params
             .config()
-            .keys()
+            .keys
             .iter()
             .map(|k| {
-                let ty_id = type_id(k.name());
-                let exts = extractors.get(&ty_id).unwrap_or(&FIELD_EXTRACTORS);
-                let meta = metadata.get(&ty_id).unwrap_or(&KEY_METADATA);
+                let ty_id = type_id(k.name.as_str());
+                let exts = extractors.get(&ty_id).unwrap();
+                let meta = metadata.get(&ty_id).unwrap();
 
                 BotnetKey::from_input(&input, exts, meta).unwrap_or_default()
             })
             .collect::<Vec<BotnetKey>>();
 
-        let strategy = Rc::new(Strategy::new(self.state.params.clone()));
-
-        let _results = keys
-            .iter()
-            .map(|k| {
-                if strategy.entity_counting_enabled() {
-                    strategy.count_entity(k).unwrap();
-                }
-
-                if strategy.kanon_enabled() {
-                    strategy.is_k_anonymous(k).unwrap();
-                }
-            })
-            .collect::<Vec<()>>();
-
-        req.extensions_mut().insert(botnet);
+        req.extensions_mut().insert(context);
 
         let fut = self.inner.call(req);
 

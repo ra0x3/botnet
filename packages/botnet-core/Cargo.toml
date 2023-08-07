@@ -10,6 +10,7 @@ rust-version = { workspace = true }
 version = { workspace = true }
 
 [dependencies]
+async-std = { version = "1.0" }
 async-trait = "0.1"
 bincode = "1.3"
 botnet-utils = { path = "./../botnet-utils", version = "0.2" }

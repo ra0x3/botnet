@@ -13,6 +13,7 @@ version = { workspace = true }
 proc-macro = true
 
 [dependencies]
+botnet-core = { path = "./../botnet-core", version = "0.2" }
 botnet-utils = { path = "./../botnet-utils", version = "0.2" }
 proc-macro-error = "1.0"
 proc-macro2 = "1.0"

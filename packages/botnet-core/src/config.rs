@@ -1,5 +1,4 @@
 /// Botnet configuration.
-use crate::BotnetResult;
 use botnet_utils::type_id;
 use serde::{Deserialize, Serialize};
 use std::{fs::File, io::Read, path::PathBuf};
@@ -76,33 +75,26 @@ pub enum Version {
     V2,
 }
 
-/// Botnet `Field` configuration.
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+/// Botnet `TransparentField` configuration.
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct Field {
     /// Name of the field.
-    name: String,
+    pub name: String,
 
     /// Key/identifier of the field.
-    key: String,
+    pub key: String,
 
     /// Description of the field.
-    description: String,
+    pub description: Option<String>,
+
+    /// Extractor for this field.
+    pub extractor: String,
 }
 
 impl Field {
-    /// Name of the field.
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    /// Key/identifier of the field.
-    pub fn key(&self) -> &str {
-        &self.key
-    }
-
-    /// Description of the field.
-    pub fn description(&self) -> &str {
-        &self.description
+    /// Get the type ID of the field.
+    pub fn type_id(&self) -> usize {
+        type_id(self.name.as_bytes())
     }
 }
 
@@ -110,26 +102,16 @@ impl Field {
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct Key {
     /// Name of the key.
-    name: String,
+    pub name: String,
 
     /// Fields associated with this `Key`.
-    fields: Vec<Field>,
+    pub fields: Vec<Field>,
 }
 
 impl Key {
-    /// Get the name of the key.
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
     /// Get the type ID of the key.
     pub fn type_id(&self) -> usize {
         type_id(self.name.as_bytes())
-    }
-
-    /// Fields associated with this `Key`.
-    pub fn fields(&self) -> &Vec<Field> {
-        &self.fields
     }
 }
 
@@ -137,21 +119,19 @@ impl Key {
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct KAnon {
     /// K-Anonimity level.
-    k: KAnonimity,
+    pub k: KAnonimity,
 
     /// K-Anonimity enabled.
-    enabled: bool,
+    pub enabled: bool,
 }
 
 impl KAnon {
-    /// K-Anonimity level.
-    pub fn k(&self) -> u64 {
-        self.k.k()
-    }
-
-    /// K-Anonimity enabled.
-    pub fn enabled(&self) -> bool {
-        self.enabled
+    pub fn is_k_anonymous(&self, x: usize) -> bool {
+        match self.k {
+            KAnonimity::K100 => x >= 100,
+            KAnonimity::K800 => x >= 800,
+            KAnonimity::K8000 => x >= 8000,
+        }
     }
 }
 
@@ -159,74 +139,33 @@ impl KAnon {
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct EntityCounter {
     /// Entity counting enabled.
-    enabled: bool,
+    pub enabled: bool,
 
     /// Entity class.
-    counter: EntityClass,
-}
-
-impl EntityCounter {
-    /// Entity counting enabled.
-    pub fn enabled(&self) -> bool {
-        self.enabled
-    }
-
-    /// Entity class.
-    pub fn counter(&self) -> &EntityClass {
-        &self.counter
-    }
+    pub counter: EntityClass,
 }
 
 /// Botnet cliff detection configuration.
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct CliffDetection {
     /// Cliff detection enabled.
-    enabled: bool,
+    pub enabled: bool,
 
     /// Cliff detector.
-    detector: CliffDetector,
+    pub detector: CliffDetector,
 }
 
-impl CliffDetection {
-    /// Cliff detection enabled.
-    pub fn enabled(&self) -> bool {
-        self.enabled
-    }
-
-    /// Cliff detector.
-    pub fn detector(&self) -> &CliffDetector {
-        &self.detector
-    }
-}
-
-/// Botnet strategy configuration.
+/// Botnet plan configuration.
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
-pub struct Strategy {
+pub struct Plan {
     /// Entity counting configuration.
-    entity: EntityCounter,
+    pub entity: EntityCounter,
 
     /// K-Anon configuration.
-    kanon: KAnon,
+    pub kanon: KAnon,
 
     /// Cliff detection configuration.
-    cliff: CliffDetection,
-}
-
-impl Strategy {
-    /// Entity counting configuration.
-    pub fn entity(&self) -> &EntityCounter {
-        &self.entity
-    }
-
-    /// K-Anon configuration.
-    pub fn kanon(&self) -> &KAnon {
-        &self.kanon
-    }
-
-    /// Cliff detection configuration.
-    pub fn cliff(&self) -> &CliffDetection {
-        &self.cliff
-    }
+    pub cliff: CliffDetection,
 }
 
 /// Botnet database type configuration.
@@ -245,65 +184,38 @@ pub enum DbType {
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct Database {
     /// Database type.
-    db_type: DbType,
+    pub db_type: DbType,
 
     /// Database URI.
-    uri: Option<String>,
-}
-
-impl Database {
-    /// Database type.
-    pub fn db_type(&self) -> &DbType {
-        &self.db_type
-    }
-
-    /// Database URI.
-    pub fn uri(&self) -> Option<&String> {
-        self.uri.as_ref()
-    }
+    pub uri: Option<String>,
 }
 
 /// Botnet configuration.
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct BotnetConfig {
     /// Botnet config version.
-    version: Version,
+    pub version: Version,
 
-    /// Botnet config strategy.
-    strategy: Strategy,
+    /// Botnet config plan.
+    pub plan: Plan,
 
     /// Botnet config keys.
-    keys: Vec<Key>,
+    pub keys: Vec<Key>,
 
     /// Database configuration.
-    database: Database,
+    pub database: Database,
 }
 
-impl BotnetConfig {
+impl From<PathBuf> for BotnetConfig {
     /// Create a new botnet configuration.
-    pub fn from_path(value: Option<PathBuf>) -> BotnetResult<Self> {
-        let value = value.unwrap_or(PathBuf::from(""));
-        let mut file = File::open(value)?;
+    fn from(value: PathBuf) -> Self {
+        let mut file = File::open(value).expect("Unable to open file.");
         let mut content = String::new();
-        file.read_to_string(&mut content)?;
+        file.read_to_string(&mut content)
+            .expect("Unable to read file.");
 
-        let config: BotnetConfig = serde_yaml::from_str(&content)?;
+        let config: BotnetConfig = serde_yaml::from_str(&content).expect("Bad config.");
 
-        Ok(config)
-    }
-
-    /// Get the keys for this configuration.
-    pub fn keys(&self) -> &Vec<Key> {
-        &self.keys
-    }
-
-    /// Get the strategy for this configuration.
-    pub fn strategy(&self) -> &Strategy {
-        &self.strategy
-    }
-
-    /// Get the database for this configuration.
-    pub fn database(&self) -> &Database {
-        &self.database
+        config
     }
 }

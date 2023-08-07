@@ -1,46 +1,45 @@
+use crate::context::BotnetContext;
 /// Utilities used in anomaly detection tasks.
 use crate::database::Database;
 use crate::models::*;
 use bytes::{Buf, Bytes};
+use std::rc::Rc;
 
 /// Create a new strategy with which to run anomaly detection.
 pub struct Strategy {
     /// The parameters with which to execute the strategy.
-    #[allow(unused)]
-    pub params: BotnetParams,
+    pub context: Rc<BotnetContext>,
 }
 
 impl Strategy {
     /// Create a new strategy with which to run anomaly detection.
-    pub fn new(params: BotnetParams) -> Self {
-        Self { params }
+    pub fn new(context: Rc<BotnetContext>) -> Self {
+        Self { context }
     }
 
     /// Return whether or not the `entity_counting` strategy is enabled.
     pub fn entity_counting_enabled(&self) -> bool {
-        self.params.config().strategy().entity().enabled()
+        self.context.config().plan.entity.enabled
     }
 
     /// Return whether or not the `kanon` strategy is enabled.
     pub fn kanon_enabled(&self) -> bool {
-        self.params.config().strategy().kanon().enabled()
+        self.context.config().plan.kanon.enabled
     }
 
     /// Count this entity in the stratey.
-    pub fn count_entity(&self, k: &BotnetKey) -> BotnetResult<u64> {
-        let mut db = self.params.db().expect("Database expected.");
-        db.incr_key(k)
+    pub fn count_entity(&self, k: &BotnetKey) -> BotnetResult<usize> {
+        self.context.count_entity(k)
     }
 
     /// Return whether or not the entity is k-anonymous.
     pub fn is_k_anonymous(&self, k: &BotnetKey) -> BotnetResult<bool> {
-        let db = self.params.db().expect("Database expected.");
-        let mut v = db
+        let db = self.context.db().expect("Database expected.");
+        let v = db
             .get_key(k)?
-            .unwrap_or(Bytes::from(0u64.to_le_bytes().to_vec()));
-        let v = v.get_u64_le();
-        let k = self.params.config().strategy().kanon().k();
-        Ok(v >= k)
+            .unwrap_or(Bytes::from(0usize.to_le_bytes().to_vec()))
+            .get_u64_le() as usize;
+        Ok(self.context.config().plan.kanon.is_k_anonymous(v))
     }
 
     /// Return whether or not the entity has hit the 'cliff'.
@@ -49,6 +48,6 @@ impl Strategy {
     }
 
     pub fn has_really_hit_cliff(&self) -> bool {
-        true
+        unimplemented!()
     }
 }

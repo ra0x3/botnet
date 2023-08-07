@@ -20,6 +20,9 @@ pub mod models;
 /// Utilities used in anomaly detection tasks.
 pub mod task;
 
+/// Botnet context.
+pub mod context;
+
 pub use bytes::Bytes;
 pub use nom::AsBytes;
 pub use serde_json::Value as SerdeValue;
@@ -29,13 +32,20 @@ use std::{fmt::Debug, io::Error as IoError, sync::PoisonError};
 use thiserror::Error;
 use tokio::task::JoinError;
 
-use crate::models::{Field, Input};
+use crate::models::{Input, TransparentField};
 
 /// Result type for used in botnet core operations.
 pub type BotnetResult<T> = Result<T, BotnetError>;
 
 /// Function used to exctract a field from an input.
-pub type ExtractorFn = fn(&Input) -> BotnetResult<Field>;
+pub type ExtractorFn = fn(&Input) -> BotnetResult<TransparentField>;
+
+/// Extension collections and utils for `botnet_core`.
+pub mod ext {
+    pub use std::{collections::HashMap, rc::Rc};
+
+    pub use async_std::sync::Arc;
+}
 
 /// `botnet_core` module prelude.
 pub mod prelude {
@@ -54,6 +64,15 @@ pub mod prelude {
 
     /// Re-exports botnet strategies.
     pub use crate::task::Strategy;
+
+    /// Re-exports botnet extractors.
+    pub use crate::extractor::*;
+
+    /// Re-exports botnet context.
+    pub use crate::context::BotnetContext;
+
+    /// Re-exports `botnet_core::ext`
+    pub use crate::ext::*;
 }
 
 /// Error type for used in botnet core operations.
@@ -72,12 +91,16 @@ pub enum BotnetError {
     SerdeYamlError(#[from] serde_yaml::Error),
     #[error("IoError: {0:#?}")]
     IoError(#[from] IoError),
-    #[error("Error")]
-    Error(#[from] Box<dyn std::error::Error>),
+    #[error("Error: {0:#?}")]
+    Error(String),
     #[error("JoinError: {0:#?}")]
     JoinError(#[from] JoinError),
     #[error("Lock poisoned.")]
     PoisonError,
+    // #[error("ParseError: {0:#?}")]
+    // UrlParseError(#[from] url::ParseError),
+    #[error("Error: {0:#?}")]
+    UnknownError(#[from] Box<dyn std::error::Error>),
 }
 
 impl<T> From<PoisonError<T>> for BotnetError {
