@@ -28,7 +28,7 @@ impl ConfigBuilder {
 
         BotnetMainArgs {
             path: path
-                .expect("`path` specification is required in indexer definition.")
+                .expect("`config` specification is required in botnet definition.")
                 .name
                 .value(),
         }

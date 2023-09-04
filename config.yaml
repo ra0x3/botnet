@@ -2,13 +2,16 @@ version: v1
 plan:
   entity:
     enabled: true
-    counter: ip_ua
-  kanon:
-    k: k100
+    class: IPUAEntityCounter
+  anonimity:
+    kanonimity:
+      enabled: true
+      k: 100
+      class: KAnonimity
+  limiter:
     enabled: true
-  cliff:
-    enabled: true
-    detector: v1
+    version: 100
+    class: CliffDetector
 keys:
   - name: http
     fields:

@@ -1,6 +1,5 @@
 /// A collection of anomaly detection compatible NoSQL databases.
-use crate::models::*;
-use crate::Bytes;
+use crate::{models::key::BotnetKey, BotnetResult, Bytes};
 use async_trait::async_trait;
 use bytes::Buf;
 use std::{
@@ -14,7 +13,7 @@ use redis::{Client as RedisClient, Connection as RedisConnection};
 
 /// Used to ensure all database logic conforms to a unified interface.
 #[async_trait]
-pub trait Database {
+pub trait Store {
     /// Set a key in the database.
     fn set_key(&mut self, k: &BotnetKey, v: Bytes) -> BotnetResult<()>;
 
@@ -28,10 +27,10 @@ pub trait Database {
     fn get_bytes(&self, k: &Bytes) -> BotnetResult<Option<Bytes>>;
 
     /// Increment a key in the database.
-    fn incr_key(&mut self, k: &BotnetKey) -> BotnetResult<usize>;
+    fn incr_key(&mut self, k: &BotnetKey) -> BotnetResult<u64>;
 }
 
-/// Database type.
+/// Store type.
 #[derive(Clone, Debug)]
 enum DbType {
     /// In-memory database.
@@ -45,11 +44,11 @@ enum DbType {
 /// In-memory database.
 #[derive(Clone, Debug)]
 pub struct InMemory {
-    /// Database type.
+    /// Store type.
     #[allow(unused)]
     db_type: DbType,
 
-    /// Database items.
+    /// Store items.
     items: Arc<Mutex<HashMap<Bytes, Bytes>>>,
 }
 
@@ -70,7 +69,7 @@ impl Default for InMemory {
     }
 }
 
-impl Database for InMemory {
+impl Store for InMemory {
     /// Set a key in the database.
     fn set_key(&mut self, k: &BotnetKey, v: Bytes) -> BotnetResult<()> {
         self.items.lock()?.insert(k.flatten(), v);
@@ -94,9 +93,9 @@ impl Database for InMemory {
     }
 
     /// Increment a key in the database.
-    fn incr_key(&mut self, k: &BotnetKey) -> BotnetResult<usize> {
-        let v: usize = match self.items.lock()?.remove(&k.flatten()) {
-            Some(mut v) => (v.get_u64_le() + 1) as usize,
+    fn incr_key(&mut self, k: &BotnetKey) -> BotnetResult<u64> {
+        let v: u64 = match self.items.lock()?.remove(&k.flatten()) {
+            Some(mut v) => v.get_u64_le() + 1,
             None => 1,
         };
         self.set_key(k, Bytes::from(v.to_le_bytes().to_vec()))?;
@@ -127,7 +126,7 @@ impl Redis {
 /// Redis database.
 #[cfg(feature = "redisdb")]
 #[async_trait]
-impl Database for Redis {
+impl Store for Redis {
     /// Set a key in the database.
     #[allow(unused)]
     fn set_key(&mut self, k: &BotnetKey, v: Bytes) -> BotnetResult<()> {
@@ -154,7 +153,7 @@ impl Database for Redis {
 
     /// Increment a key in the database.
     #[allow(unused)]
-    fn incr_key(&mut self, k: &BotnetKey) -> BotnetResult<usize> {
+    fn incr_key(&mut self, k: &BotnetKey) -> BotnetResult<u64> {
         unimplemented!()
     }
 }

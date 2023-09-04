@@ -4,7 +4,7 @@ strategy:
     enabled: true
     counter: ip_ua
   kanon:
-    k: k100
+    k: 100
     enabled: true
   cliff:
     enabled: true

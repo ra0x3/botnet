@@ -1,18 +1,10 @@
 use botnet::prelude::*;
-use clap::Parser;
 use std::{env, io, path::PathBuf, str::FromStr};
 use tokio::{io::Interest, net::UnixListener};
 use tracing_subscriber::filter::EnvFilter;
 
 const RUST_LOG: &str = "RUST_LOG";
 const HUMAN_LOGGING: &str = "HUMAN_LOGGING";
-
-#[derive(Parser)]
-#[clap(name = "hello-world", about = "Botnet middleware example.")]
-struct Args {
-    #[clap(short, long, help = "Path to configuration file.")]
-    pub config: Option<PathBuf>,
-}
 
 pub fn init_logging() -> Result<(), Box<dyn std::error::Error>> {
     let filter = match env::var_os(RUST_LOG) {
@@ -48,12 +40,11 @@ pub fn init_logging() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-#[botnet::main(config = "config.yaml.example")]
+#[botnet::main(config = "config.yaml")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     init_logging()?;
 
-    let context = Rc::new(context);
-
+    let context = Arc::new(context);
     let listener = UnixListener::bind("/tmp/botnet.sock").unwrap();
     loop {
         match listener.accept().await {

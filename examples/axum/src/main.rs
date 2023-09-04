@@ -3,7 +3,6 @@
 /// A simple example of how `Botnet` can be plugged into an axum web server middleware.
 use axum::{http::Method, routing::get, Router};
 use botnet::prelude::*;
-use clap::Parser;
 use std::{env, net::SocketAddr, path::PathBuf, str::FromStr};
 use tower_http::{
     cors::{Any, CorsLayer},
@@ -13,20 +12,14 @@ use tower_http::{
 use tracing::Level;
 use tracing_subscriber::filter::EnvFilter;
 
-#[derive(Parser)]
-#[clap(name = "hello-world", about = "Botnet middleware example.")]
-struct Args {
-    #[clap(short, long, help = "Path to configuration file.")]
-    pub config: Option<PathBuf>,
-}
-
 pub async fn root() -> &'static str {
     "Hello, World!"
 }
 
-#[extractor(path)]
-async fn extractor(input: &Input) -> BotnetResult<TransparentField> {
-    Ok(TransparentField::new("test", "test", None))
+#[extractor(Path)]
+async fn extractor(input: &input::Input) -> BotnetResult<field::ExtractedField> {
+    // FIXME: extract actual path from url
+    Ok(field::ExtractedField::new("test", Bytes::from("test")))
 }
 
 pub fn init_logging() -> Result<(), Box<dyn std::error::Error>> {
@@ -63,7 +56,7 @@ pub fn init_logging() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-#[botnet::main(config = "config.yaml.example")]
+#[botnet::main(config = "config.yaml")]
 async fn main() -> BotnetResult<()> {
     init_logging()?;
 
@@ -71,7 +64,7 @@ async fn main() -> BotnetResult<()> {
 
     let app = Router::new()
         .route("/", get(root))
-        .layer(BotnetMiddleware::from(context))
+        .layer(BotnetMiddleware::from(Arc::new(context)))
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(DefaultMakeSpan::new().include_headers(true))

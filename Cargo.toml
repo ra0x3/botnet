@@ -6,7 +6,7 @@ members = [
     "packages/botnet-macros",
     "packages/botnet-utils",
     "examples/axum",
-    "examples/unix-socket"
+    # "examples/unix-socket"
 ]
 
 default-members = [

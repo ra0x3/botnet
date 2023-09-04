@@ -1,17 +1,28 @@
 /// A collection of models used used in anomaly detection evaluation.
 pub use crate::{
-    config::{BotnetConfig, DbType, Field, Key},
-    database::{Database, InMemory},
-    models::*,
-    AsBytes, BotnetError, BotnetResult, ExtractorFn,
+    config::{Anonimity, BotnetConfig, DbType, EntityCounter, Field, Key, RateLimit},
+    database::{InMemory, Store},
+    models::{
+        extractor::{Extractors, FieldExtractors},
+        key::{BotnetKey, BotnetKeyMetadata},
+        Metadata,
+    },
+    AsBytes, BotnetError, BotnetResult,
 };
 use std::{collections::HashMap, fmt::Debug, sync::Arc};
 
 /// Bontet context.
+///
+/// The interface through which the botnet is configured and used.
 #[derive(Clone, Default, Debug)]
-pub struct BotnetContext {
+pub struct BotnetContext<E, A, C>
+where
+    E: EntityCounter,
+    A: Anonimity + Default,
+    C: RateLimit,
+{
     /// Botnet keys.
-    keys: Arc<HashMap<usize, BotnetKey>>,
+    keys: Arc<HashMap<usize, Key>>,
 
     /// Botnet metadata.
     metadata: Arc<Metadata>,
@@ -23,18 +34,26 @@ pub struct BotnetContext {
     db: Option<InMemory>,
 
     /// Botnet configuration.
-    config: Arc<BotnetConfig>,
+    config: Arc<BotnetConfig<E, A, C>>,
 }
 
-impl BotnetContext {
+impl<E, A, C> BotnetContext<E, A, C>
+where
+    E: EntityCounter,
+    A: Anonimity + Default,
+    C: RateLimit,
+{
     /// Create a new `BotnetContext`.
     pub fn new(
-        keys: HashMap<usize, BotnetKey>,
         metadata: Metadata,
         extractors: Extractors,
         db: Option<InMemory>,
-        config: BotnetConfig,
+        config: BotnetConfig<E, A, C>,
     ) -> Self {
+        let keys = config.keys.iter().fold(HashMap::new(), |mut acc, k| {
+            acc.insert(k.type_id(), k.clone());
+            acc
+        });
         Self {
             keys: Arc::new(keys),
             metadata: Arc::new(metadata),
@@ -44,37 +63,33 @@ impl BotnetContext {
         }
     }
 
-    /// Return the set of `BotnetKey`s associated with these `Botnet`.
-    pub fn keys(&self) -> Arc<HashMap<usize, BotnetKey>> {
-        self.keys.clone()
+    /// Return the set of `Key`s associated with these `Botnet`.
+    pub fn keys(&self) -> &Arc<HashMap<usize, Key>> {
+        &self.keys
     }
 
-    /// Return the set of `Metadata`s associated with these `Botnet`.
-    pub fn metadata(&self) -> Arc<Metadata> {
-        self.metadata.clone()
+    /// Return the `Key` associated with a particular type ID.
+    pub fn get_key(&self, ty_id: &usize) -> Option<&Key> {
+        self.keys.get(ty_id)
     }
 
-    /// Return the `Database` associated with these `Botnet`.
+    /// Return the `Store` associated with these `Botnet`.
     pub fn db(&self) -> Option<InMemory> {
         self.db.clone()
     }
 
     /// Return the `BotnetConfig` associated with these `Botnet`.
-    pub fn config(&self) -> Arc<BotnetConfig> {
+    pub fn config(&self) -> Arc<BotnetConfig<E, A, C>> {
         self.config.clone()
     }
 
-    /// Return the `Extractors` associated with these `Botnet`.
-    ///
-    /// These `Extractors` are the literal extractor object, whereas the data
-    /// in `BotnetKey`s are the _result_ of applying the `Extractors`.
-    pub fn extractors(&self) -> Arc<Extractors> {
-        self.extractors.clone()
+    /// Return the `Extractors` for a particular `BotnetKey`.
+    pub fn get_extractors(&self, ty_id: &usize) -> BotnetResult<&FieldExtractors> {
+        self.extractors.get(ty_id)
     }
 
-    /// Count this entity in the stratey.
-    pub fn count_entity(&self, k: &BotnetKey) -> BotnetResult<usize> {
-        let mut db = self.db().expect("Database expected.");
-        db.incr_key(k)
+    /// Return metadata for a particular `BotnetKey`.
+    pub fn get_metadata(&self, ty_id: &usize) -> BotnetResult<&BotnetKeyMetadata> {
+        self.metadata.get(ty_id)
     }
 }

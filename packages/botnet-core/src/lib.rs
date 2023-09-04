@@ -11,9 +11,6 @@ pub mod config;
 /// Utilities used in anomaly detection evaluation.
 pub mod eval;
 
-/// Utilities used in anomaly detection feature extraction.
-pub mod extractor;
-
 /// A collection of models used used in anomaly detection evaluation.
 pub mod models;
 
@@ -32,47 +29,48 @@ use std::{fmt::Debug, io::Error as IoError, sync::PoisonError};
 use thiserror::Error;
 use tokio::task::JoinError;
 
-use crate::models::{Input, TransparentField};
-
 /// Result type for used in botnet core operations.
 pub type BotnetResult<T> = Result<T, BotnetError>;
-
-/// Function used to exctract a field from an input.
-pub type ExtractorFn = fn(&Input) -> BotnetResult<TransparentField>;
 
 /// Extension collections and utils for `botnet_core`.
 pub mod ext {
     pub use std::{collections::HashMap, rc::Rc};
 
     pub use async_std::sync::Arc;
+
+    pub use serde;
+
+    pub use super::Bytes;
 }
 
 /// `botnet_core` module prelude.
 pub mod prelude {
 
+    pub use super::{BotnetError, BotnetResult};
+
     /// Re-exports all `botnet_core` models.
     pub use super::models::*;
 
     /// Re-exports all `botnet_core` database utils.
-    pub use crate::database::*;
+    pub use super::database::*;
 
     /// Re-exports `BotnetConfig`.
-    pub use crate::config::BotnetConfig;
+    pub use super::config::*;
 
     /// Re-exports botnet evaluators.
-    pub use crate::eval::Evaluator;
+    pub use super::eval::Evaluator;
 
     /// Re-exports botnet strategies.
-    pub use crate::task::Strategy;
-
-    /// Re-exports botnet extractors.
-    pub use crate::extractor::*;
+    pub use super::task::Strategy;
 
     /// Re-exports botnet context.
-    pub use crate::context::BotnetContext;
+    pub use super::context::BotnetContext;
 
     /// Re-exports `botnet_core::ext`
-    pub use crate::ext::*;
+    pub use super::ext::*;
+
+    /// Re-exports `botnet_core::models`.
+    pub use super::models::*;
 }
 
 /// Error type for used in botnet core operations.
@@ -97,8 +95,6 @@ pub enum BotnetError {
     JoinError(#[from] JoinError),
     #[error("Lock poisoned.")]
     PoisonError,
-    // #[error("ParseError: {0:#?}")]
-    // UrlParseError(#[from] url::ParseError),
     #[error("Error: {0:#?}")]
     UnknownError(#[from] Box<dyn std::error::Error>),
 }
