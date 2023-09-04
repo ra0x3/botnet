@@ -4,6 +4,15 @@ members = [
     "packages/botnet",
     "packages/botnet-core",
     "packages/botnet-macros",
+    "packages/botnet-utils",
+    "examples/axum",
+    "examples/unix-socket"
+]
+
+default-members = [
+    "packages/botnet",
+    "packages/botnet-core",
+    "packages/botnet-macros",
     "packages/botnet-utils"
 ]
 

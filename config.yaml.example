@@ -1,0 +1,32 @@
+version: v1
+plan:
+  entity:
+    enabled: true
+    counter: ip_ua
+  kanon:
+    k: k100
+    enabled: true
+  cliff:
+    enabled: true
+    detector: v1
+keys:
+  - name: http
+    fields:
+      - name: ssl
+        key: ssl
+        description: SSL parameter.
+        extractor: UrlExtractor
+      - name: region
+        key: region
+        description: Region parameter.
+        extractor: UrlExtractor
+  - name: ip
+    fields:
+      - name: ip
+        key: ip
+        description: IP address.
+        extractor: IPExtractor
+database:
+  db_type: in_memory
+  uri: ~
+

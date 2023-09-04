@@ -28,7 +28,7 @@ pub trait Database {
     fn get_bytes(&self, k: &Bytes) -> BotnetResult<Option<Bytes>>;
 
     /// Increment a key in the database.
-    fn incr_key(&mut self, k: &BotnetKey) -> BotnetResult<u64>;
+    fn incr_key(&mut self, k: &BotnetKey) -> BotnetResult<usize>;
 }
 
 /// Database type.
@@ -94,9 +94,9 @@ impl Database for InMemory {
     }
 
     /// Increment a key in the database.
-    fn incr_key(&mut self, k: &BotnetKey) -> BotnetResult<u64> {
-        let v = match self.items.lock()?.remove(&k.flatten()) {
-            Some(mut v) => v.get_u64_le() + 1,
+    fn incr_key(&mut self, k: &BotnetKey) -> BotnetResult<usize> {
+        let v: usize = match self.items.lock()?.remove(&k.flatten()) {
+            Some(mut v) => (v.get_u64_le() + 1) as usize,
             None => 1,
         };
         self.set_key(k, Bytes::from(v.to_le_bytes().to_vec()))?;
@@ -154,7 +154,7 @@ impl Database for Redis {
 
     /// Increment a key in the database.
     #[allow(unused)]
-    fn incr_key(&mut self, k: &BotnetKey) -> BotnetResult<u64> {
+    fn incr_key(&mut self, k: &BotnetKey) -> BotnetResult<usize> {
         unimplemented!()
     }
 }
