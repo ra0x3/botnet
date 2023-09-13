@@ -1,18 +1,3 @@
-use botnet_core::{
-    models::{BotnetKey, Input},
-    task::Strategy,
-};
-use botnet_utils::type_id;
-
-#[macro_export]
-macro_rules! botnet_ctx {
-    ($mod: pat) => {
-
-        use #r#mod;
-
-    };
-}
-
 /// Botnet middleware middleware utils.
 pub mod middleware;
 
@@ -26,8 +11,8 @@ pub mod core {
 /// Botnet prelude.
 pub mod prelude {
 
-    /// Re-exported `botnet_core::prelude`.
-    pub use botnet_core::prelude::*;
+    /// Re-exported `crate::core::prelude`.
+    pub use crate::core::prelude::*;
 
     /// Re-exported `botnet_macros`.
     pub use botnet_macros::*;
@@ -36,7 +21,7 @@ pub mod prelude {
     pub use crate::middleware::*;
 
     /// Re-exported `botnet::*`.
-    pub use crate::{botnet, botnet_ctx};
+    pub use crate::botnet;
 }
 
 /// Botnet macros.
@@ -44,8 +29,6 @@ pub mod macros {
 
     /// Re-exported `botnet_macros`.
     pub use botnet_macros::*;
-
-    pub use crate::botnet_ctx;
 }
 
 /// Botnet utils.
@@ -55,7 +38,7 @@ pub mod utils {
     pub use botnet_utils::*;
 }
 
-use std::rc::Rc;
+use async_std::sync::Arc;
 
 /// Re-export of `#[tokio::main]`.
 pub use botnet_macros::main;
@@ -66,51 +49,61 @@ pub use botnet_macros::main;
 /// be plugged into `botnet::middleware`.
 ///
 /// This is most likely how botnet will most often be called from arbitrary contexts.
-pub async fn botnet(
-    context: Rc<botnet_core::context::BotnetContext>,
+pub async fn botnet<E, A, C>(
+    context: Arc<crate::core::context::BotnetContext<E, A, C>>,
     input: Vec<u8>,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let input = Input::from(input);
-
-    let extractors = context.extractors();
-    let metadata = context.metadata();
-
+) -> Result<(), Box<dyn std::error::Error>>
+where
+    E: crate::core::config::EntityCounter,
+    A: crate::core::config::Anonimity + Default,
+    C: crate::core::config::RateLimit,
+{
+    let input = crate::core::models::input::Input::from(input);
     let _keys = context
         .keys()
         .iter()
-        .map(|(_, k)| {
-            let ty_id = type_id(k.name());
-            let exts = extractors.get(&ty_id).unwrap();
-            let meta = metadata.get(&ty_id).unwrap();
-
-            BotnetKey::from_input(&input, exts, meta).unwrap_or_default()
+        .map(|(ty_id, _)| {
+            let exts = context
+                .get_extractors(ty_id)
+                .expect("Invalid type ID for extractors.");
+            let meta = context
+                .get_metadata(ty_id)
+                .expect("Invalid type ID for metadata.");
+            crate::core::models::key::BotnetKey::from((&input, exts, meta))
         })
-        .collect::<Vec<BotnetKey>>();
-
-    let _strategy = Strategy::new(context.clone());
+        .collect::<Vec<crate::core::models::key::BotnetKey>>();
 
     Ok(())
 }
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use botnet_core::{config::BotnetConfig, context::BotnetContext, Url};
+    use crate::{core::Url, prelude::*};
     use std::path::PathBuf;
 
-    #[test]
-    fn test_can_run_botnet_from_config() {
-        // Check config.
-        let config = BotnetConfig::from(PathBuf::from("./../../config.yaml.example"));
-        assert_eq!(config.keys.len(), 2);
+    #[botest(config = "config.yaml")]
+    fn test_botnet() {
+        let key_id = 3472328297305896040;
+        let config_key = context.get_key(&key_id).unwrap();
 
-        let _input: Input =
-            Url::parse("http://localhost:8080/api/v1/foo/bar?zoo=1&baz=true&region=usw")
+        assert_eq!(config_key.name, "http".to_string());
+        assert_eq!(config_key.fields.len(), 2);
+
+        let field = config_key.fields.first().unwrap();
+        assert_eq!(field.key, "ssl");
+        assert_eq!(field.name, "ssl");
+        assert_eq!(field.description, Some("SSL parameter.".to_string()));
+
+        let input: input::Input =
+            Url::parse("http://localhost:8080/api/v1/foo/bar?zoo=1&baz=true&region=usw&ssl=v1.3&ip=1.1.1.1")
                 .unwrap()
                 .into();
 
-        let context = BotnetContext::default();
+        let extractors = context.get_extractors(&key_id).unwrap();
+        let metadata = context.get_metadata(&key_id).unwrap();
+        let extracted_key = key::BotnetKey::from((&input, extractors, metadata));
 
-        assert_eq!(context.keys().len(), 2);
+        assert_eq!(extracted_key.name(), config_key.name);
+        assert_eq!(extracted_key.fields().len(), config_key.fields.len());
     }
 }

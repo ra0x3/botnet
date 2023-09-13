@@ -1,7 +1,7 @@
 extern crate proc_macro;
 
 use crate::parser::BotnetMainArgs;
-use botnet_core::config::BotnetConfig;
+use botnet_core::config::*;
 use proc_macro::TokenStream;
 use proc_macro_error::proc_macro_error;
 use quote::{format_ident, quote};
@@ -22,7 +22,7 @@ fn process_task(attrs: TokenStream, input: TokenStream) -> TokenStream {
         impl<K, D> Task<K, D> for #ident
         where
             K: DatabaseKey + 'static,
-            D: Database + Send + Sync + 'static
+            D: Store + Send + Sync + 'static
         {
             #func
         }
@@ -62,18 +62,11 @@ fn process_extractor(attrs: TokenStream, input: TokenStream) -> TokenStream {
 
         struct #ident;
 
-        impl Extractor for #ident {
-            fn extract(&self, key: &str, input: &Input) -> BotnetResult<TransparentField> {
+        impl extractor::Extractor for #ident {
+            fn extract(&self, key: &str, input: &input::Input) -> BotnetResult<field::ExtractedField> {
                 #block
             }
         }
-
-        impl From<String> for #ident {
-            fn from(_: String) -> Self {
-                Self
-            }
-        }
-
     };
 
     TokenStream::from(output)
@@ -86,22 +79,121 @@ fn process_main(attrs: TokenStream, input: TokenStream) -> TokenStream {
     let BotnetMainArgs { path } = manifest;
 
     let path = canonicalize(path).expect("Failed to canonicalize path.");
+    let pathstr = path.clone().to_str().unwrap().to_string();
 
     match canonicalize(path) {
         Ok(path) => {
-            let config = BotnetConfig::from(path);
+            let config: BotnetConfig<IPUAEntityCounter, KAnonimity, CliffDetector> =
+                BotnetConfig::from(path);
             let mut tokens = quote! {
-                let mut extractors = Extractors::new();
+                let mut extractors = extractor::Extractors::new();
             };
+
+            let ext_idents = vec![
+                format_ident!("IPUAEntityCounter"),
+                format_ident!("KAnonimity"),
+                format_ident!("CliffDetector"),
+            ];
 
             for k in config.keys {
                 tokens = quote! {
                     #tokens
-                    let mut field_exts = FieldExtractors::new();
+                    let mut field_exts = extractor::FieldExtractors::new();
+                };
+
+                for f in &k.fields {
+                    let ext_name = format_ident!("{}", f.extractor);
+                    let key = f.key.to_string();
+                    tokens = quote! {
+                        #tokens
+                        field_exts.insert(#key.to_string(), extractor::FieldExtractor {
+                            key: #key.to_string(),
+                            func: Box::new(#ext_name) as Box<dyn Extractor>,
+                        });
+                    }
+                }
+
+                let ty_id = k.type_id();
+                tokens = quote! {
+                    #tokens
+                    extractors.insert(#ty_id, field_exts);
+                }
+            }
+
+            let injection = quote! {
+
+                use botnet::core::models::extractor::*;
+
+                let p = format!("{}", #pathstr);
+                let config = BotnetConfig::from(PathBuf::from(&p));
+                let key_meta = config.keys.iter().map(|k| {
+                    let field_meta = k.fields.iter().map(|f| field::FieldMetadata::new(&f.name, &f.name, f.description.as_ref())).collect::<Vec<field::FieldMetadata>>();
+                    (k.type_id(), key::BotnetKeyMetadata::from((k.type_id(), k.name.as_str(), field_meta)))
+                });
+                let metadata = Metadata::from(key_meta);
+                let db = Some(InMemory::default());
+
+
+                #tokens
+
+                let context = BotnetContext::<#(#ext_idents),*>::new(metadata, extractors, db, config);
+            };
+
+            let block: Block = parse_quote!({
+                #injection
+            });
+
+            let Block { ref mut stmts, .. } = *func.block;
+
+            for stmt in block.stmts.into_iter().rev() {
+                stmts.insert(0, stmt);
+            }
+
+            let output = quote! {
+
+                #[tokio::main]
+                #func
+            };
+
+            TokenStream::from(output)
+        }
+        Err(e) => {
+            proc_macro_error::abort_call_site!("Failed to canonicalize path: {:?}", e);
+        }
+    }
+}
+
+fn process_botnet_test(attrs: TokenStream, input: TokenStream) -> TokenStream {
+    let manifest = parse_macro_input!(attrs as BotnetMainArgs);
+    let mut func = parse_macro_input!(input as ItemFn);
+
+    let BotnetMainArgs { path } = manifest;
+
+    let path = canonicalize(path).expect("Failed to canonicalize path.");
+    let pathstr = path.clone().to_str().unwrap().to_string();
+
+    match canonicalize(path) {
+        Ok(path) => {
+            let config: BotnetConfig<IPUAEntityCounter, KAnonimity, CliffDetector> =
+                BotnetConfig::from(path);
+            let mut tokens = quote! {
+                let mut extractors = extractor::Extractors::new();
+            };
+
+            let ext_idents = vec![
+                format_ident!("{}", config.plan.entity.class()),
+                format_ident!("{}", config.plan.anonimity.class()),
+                format_ident!("{}", config.plan.limiter.class()),
+            ];
+
+            for k in config.keys {
+                tokens = quote! {
+                    #tokens
+                    let mut field_exts = field::FieldExtractors::new();
                 };
                 for f in &k.fields {
                     let ext_name = format_ident!("{}", f.extractor);
-                    let key = format!("\"{}\"", f.key);
+                    let key = f.key.to_string();
                     tokens = quote! {
                         #tokens
                         field_exts.insert(#key.to_string(), FieldExtractor {
@@ -120,17 +212,20 @@ fn process_main(attrs: TokenStream, input: TokenStream) -> TokenStream {
 
             let injection = quote! {
 
-                let opts = Args::parse();
-                let config = BotnetConfig::from(opts.config.unwrap_or_default());
-                let keys = config.keys.iter().map(|k| (k.type_id(), BotnetKey::from(k))).collect::<HashMap<usize, BotnetKey>>();
+                use botnet_core::models::extractor::*;
 
-                let key_meta = config.keys.iter().map(|k| (k.type_id(), BotnetKeyMetadata::new(&k.name)));
+                let p = format!("{}", #pathstr);
+                let config = BotnetConfig::from(PathBuf::from(&p));
+                let key_meta = config.keys.iter().map(|k| {
+                    let field_meta = k.fields.iter().map(|f| field::FieldMetadata::new(&f.name, &f.name, f.description.as_ref())).collect::<Vec<field::FieldMetadata>>();
+                    (k.type_id(), key::BotnetKeyMetadata::from((k.type_id(), k.name.as_str(), field_meta)))
+                });
                 let metadata = Metadata::from(key_meta);
                 let db = Some(InMemory::default());
 
                 #tokens
 
-                let context = BotnetContext::new(keys, metadata, extractors, db, config);
+                let context = BotnetContext::<#(#ext_idents),*>::new(metadata, extractors, db, config);
             };
 
             let block: Block = parse_quote!({
@@ -143,10 +238,15 @@ fn process_main(attrs: TokenStream, input: TokenStream) -> TokenStream {
                 stmts.insert(0, stmt);
             }
 
+            let block = &func.block;
+            let name = &func.sig.ident;
+
             let output = quote! {
 
-                #[tokio::main]
-                #func
+                #[test]
+                fn #name() {
+                    #block
+                }
             };
 
             TokenStream::from(output)
@@ -179,4 +279,10 @@ pub fn evaluator(attrs: TokenStream, input: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn main(attrs: TokenStream, input: TokenStream) -> TokenStream {
     process_main(attrs, input)
+}
+
+#[proc_macro_error]
+#[proc_macro_attribute]
+pub fn botest(attrs: TokenStream, input: TokenStream) -> TokenStream {
+    process_botnet_test(attrs, input)
 }

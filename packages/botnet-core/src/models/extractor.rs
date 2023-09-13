@@ -1,5 +1,8 @@
 /// Utilities used in anomaly detection feature extraction.
-use crate::models::*;
+use crate::{
+    models::{field::ExtractedField, input::Input},
+    BotnetError, BotnetResult, Bytes,
+};
 use std::{
     collections::HashMap,
     fmt,
@@ -10,7 +13,7 @@ use url::Url;
 /// Used to ensure all extractor logic conforms to a unified interface.
 pub trait Extractor: Send + Sync {
     /// Extract a field from an `Input`.
-    fn extract(&self, key: &str, input: &Input) -> BotnetResult<TransparentField>;
+    fn extract(&self, key: &str, input: &Input) -> BotnetResult<ExtractedField>;
 }
 
 /// URL extractor.
@@ -20,24 +23,24 @@ pub struct UrlExtractor;
 
 impl Extractor for UrlExtractor {
     /// Extract a field from a URL.
-    fn extract(&self, key: &str, input: &Input) -> BotnetResult<TransparentField> {
+    fn extract(&self, key: &str, input: &Input) -> BotnetResult<ExtractedField> {
         let url = Url::parse(input.as_ref())?;
         let params: HashMap<_, _> = url.query_pairs().into_owned().collect();
         let value = params.get(key).unwrap().to_owned();
-        Ok(TransparentField::new(key, &value, None))
+        Ok(ExtractedField::new(key, Bytes::from(value)))
     }
 }
 
 impl Extractor for Box<dyn Extractor> {
     /// Extract a field from an `Input`.
-    fn extract(&self, key: &str, input: &Input) -> BotnetResult<TransparentField> {
+    fn extract(&self, key: &str, input: &Input) -> BotnetResult<ExtractedField> {
         (**self).extract(key, input)
     }
 }
 
 impl Extractor for &Box<dyn Extractor> {
     /// Extract a field from an `Input`.
-    fn extract(&self, key: &str, input: &Input) -> BotnetResult<TransparentField> {
+    fn extract(&self, key: &str, input: &Input) -> BotnetResult<ExtractedField> {
         (**self).extract(key, input)
     }
 }
@@ -49,12 +52,12 @@ impl Extractor for IPExtractor {
     /// Extract an IP address from an `Input`.
     ///
     /// `Input` is assumed to be some type of valid URI.
-    fn extract(&self, key: &str, input: &Input) -> BotnetResult<TransparentField> {
+    fn extract(&self, key: &str, input: &Input) -> BotnetResult<ExtractedField> {
         let url = Url::parse(input.as_ref())?;
 
         // FIXME: don't panic
         let value = url.host().unwrap().to_string();
-        Ok(TransparentField::new(key, &value, None))
+        Ok(ExtractedField::new(key, Bytes::from(value)))
     }
 }
 
@@ -67,7 +70,7 @@ impl Extractor for DefaultExtractor {
     /// This extractor is just used to satisfy the compiler, and should never
     /// actually be instantiated by a user.
     #[allow(unused)]
-    fn extract(&self, key: &str, input: &Input) -> BotnetResult<TransparentField> {
+    fn extract(&self, key: &str, input: &Input) -> BotnetResult<ExtractedField> {
         unimplemented!("DefaultExtractor is not implemented.")
     }
 }
@@ -77,7 +80,7 @@ pub struct FieldExtractor<T: Extractor> {
     /// Key/identifier of the extractor.
     pub key: String,
 
-    /// Function used to extract a `TransparentField` from an `Input`.
+    /// Function used to extract a `ExtractedField` from an `Input`.
     pub func: T,
 }
 
@@ -116,7 +119,7 @@ impl<T: Extractor> FieldExtractor<T> {
     }
 }
 
-/// A collection of `FieldExtractor`s for a set of `TransparentField`s.
+/// A collection of `FieldExtractor`s for a set of `ExtractedField`s.
 #[derive(Default, Debug)]
 pub struct FieldExtractors {
     /// A map of `FieldExtractor`s.

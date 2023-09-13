@@ -1,66 +1,41 @@
+use crate::BotnetResult;
 /// Botnet configuration.
 use botnet_utils::type_id;
-use serde::{Deserialize, Serialize};
-use std::{fs::File, io::Read, path::PathBuf};
+use serde::{
+    de::{self, MapAccess, Visitor},
+    Deserialize, Serialize,
+};
+use std::{fmt, fs::File, io::Read, marker::PhantomData, path::PathBuf};
 
-/// Class of entity.
-///
-/// A fundamental concept in botnet is the entity. An entity can be associated with one or more `BotnetKey`s.
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
-#[serde(rename_all = "snake_case")]
-pub enum EntityClass {
-    /// Entities identified by IP address and user agent.
-    #[default]
-    IpUa,
+pub struct CliffDetector {
+    /// Version of the cliff detector.
+    pub version: String,
 
-    /// Entities identified by none of the above (i.e. other).
-    Other,
+    pub enabled: bool,
+
+    pub class: String,
 }
 
-/// Level of k-anonimity.
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
-#[serde(rename_all = "snake_case")]
-pub enum KAnonimity {
-    /// 100-anonimity.
-    ///
-    /// At least 100 entities must be present in this botnet key in order for anomaly detection to be performed.
-    #[default]
-    K100,
-
-    /// 800-anonimity.
-    ///
-    /// At least 800 entities must be present in this botnet key in order for anomaly detection to be performed.
-    K800,
-
-    /// 8000-anonimity.
-    ///
-    /// At least 8000 entities must be present in this botnet key in order for anomaly detection to be performed.
-    K8000,
-}
-
-impl KAnonimity {
-    /// Get the k value.
-    pub fn k(&self) -> u64 {
-        match self {
-            Self::K100 => 100,
-            Self::K800 => 800,
-            Self::K8000 => 8000,
-        }
+impl RateLimit for CliffDetector {
+    /// Register a hit.
+    fn register(&self) -> BotnetResult<()> {
+        Ok(())
     }
-}
 
-/// Anomaly detection cliff detector.
-///
-/// Used to catch traffic with a high rate of change, over a short period of time.
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
-#[serde(rename_all = "snake_case")]
-pub enum CliffDetector {
-    /// Version 1 of the cliff detector.
-    #[default]
-    V1,
+    /// Check if the cliff has been hit.
+    fn has_hit_cliff(&self) -> BotnetResult<bool> {
+        Ok(false)
+    }
 
-    /// Version 2 of the cliff detector.
-    V2,
+    /// Check if the rate limit is enabled.
+    fn enabled(&self) -> bool {
+        self.enabled
+    }
+
+    fn class(&self) -> &str {
+        &self.class
+    }
 }
 
 /// Botnet configuration version.
@@ -75,7 +50,7 @@ pub enum Version {
     V2,
 }
 
-/// Botnet `TransparentField` configuration.
+/// Botnet `ExtractedField` configuration.
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct Field {
     /// Name of the field.
@@ -116,56 +91,140 @@ impl Key {
 }
 
 /// Botnet K-Anon configuration.
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
-pub struct KAnon {
+#[derive(Serialize, Debug, Deserialize, Clone, Default)]
+pub struct KAnonimity {
     /// K-Anonimity level.
-    pub k: KAnonimity,
+    pub k: u64,
 
     /// K-Anonimity enabled.
     pub enabled: bool,
+
+    pub class: String,
 }
 
-impl KAnon {
-    pub fn is_k_anonymous(&self, x: usize) -> bool {
-        match self.k {
-            KAnonimity::K100 => x >= 100,
-            KAnonimity::K800 => x >= 800,
-            KAnonimity::K8000 => x >= 8000,
-        }
+impl Anonimity for KAnonimity {
+    fn class(&self) -> &str {
+        &self.class
+    }
+
+    /// Check if the value is anonymous.
+    fn is_anonymous(&self, x: u64) -> bool {
+        x >= self.k
+    }
+
+    /// Check if the anonimity is enabled.
+    fn enabled(&self) -> bool {
+        self.enabled
     }
 }
 
 /// Botnet entity counting configuration.
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
-pub struct EntityCounter {
+pub struct IPUAEntityCounter {
     /// Entity counting enabled.
     pub enabled: bool,
 
-    /// Entity class.
-    pub counter: EntityClass,
+    pub class: String,
 }
 
-/// Botnet cliff detection configuration.
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
-pub struct CliffDetection {
-    /// Cliff detection enabled.
-    pub enabled: bool,
+impl EntityCounter for IPUAEntityCounter {
+    fn class(&self) -> &str {
+        &self.class
+    }
 
-    /// Cliff detector.
-    pub detector: CliffDetector,
+    /// Count this entity.
+    fn count(&self) -> BotnetResult<u64> {
+        Ok(0)
+    }
+
+    /// Check if the entity counting is enabled.
+    fn enabled(&self) -> bool {
+        self.enabled
+    }
+}
+
+#[derive(Serialize, Debug, Clone)]
+pub enum BotnetAnonimity<A: Anonimity> {
+    KAnonimity(A),
+}
+
+impl<'de, A: Anonimity + Deserialize<'de>> serde::Deserialize<'de>
+    for BotnetAnonimity<A>
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct FooAnonimityVisitor<A: Anonimity>(PhantomData<A>);
+
+        impl<'de, A: Anonimity + Deserialize<'de>> Visitor<'de> for FooAnonimityVisitor<A> {
+            type Value = BotnetAnonimity<A>;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("enum BotnetAnonimity")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> Result<Self::Value, V::Error>
+            where
+                V: MapAccess<'de>,
+            {
+                while let Some(key) = map.next_key::<String>()? {
+                    if key == "kanonimity" {
+                        let value = map.next_value()?;
+                        return Ok(BotnetAnonimity::KAnonimity(value));
+                    }
+                }
+
+                Err(de::Error::custom("Unexpected keys in map"))
+            }
+        }
+
+        deserializer.deserialize_map(FooAnonimityVisitor(PhantomData))
+    }
+}
+
+impl<A: Anonimity + Default> Default for BotnetAnonimity<A> {
+    fn default() -> Self {
+        Self::KAnonimity(A::default())
+    }
+}
+
+impl<A: Anonimity> Anonimity for BotnetAnonimity<A> {
+    fn is_anonymous(&self, x: u64) -> bool {
+        match self {
+            Self::KAnonimity(a) => a.is_anonymous(x),
+        }
+    }
+
+    fn enabled(&self) -> bool {
+        match self {
+            Self::KAnonimity(a) => a.enabled(),
+        }
+    }
+
+    fn class(&self) -> &str {
+        match self {
+            Self::KAnonimity(a) => a.class(),
+        }
+    }
 }
 
 /// Botnet plan configuration.
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
-pub struct Plan {
+pub struct Plan<E, A, C>
+where
+    E: EntityCounter,
+    A: Anonimity + Default,
+    C: RateLimit,
+{
     /// Entity counting configuration.
-    pub entity: EntityCounter,
+    pub entity: E,
 
     /// K-Anon configuration.
-    pub kanon: KAnon,
+    pub anonimity: BotnetAnonimity<A>,
 
     /// Cliff detection configuration.
-    pub cliff: CliffDetection,
+    pub limiter: C,
 }
 
 /// Botnet database type configuration.
@@ -180,33 +239,43 @@ pub enum DbType {
     Redis,
 }
 
-/// Database configuration.
+/// Store configuration.
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct Database {
-    /// Database type.
+    /// Store type.
     pub db_type: DbType,
 
-    /// Database URI.
+    /// Store URI.
     pub uri: Option<String>,
 }
 
 /// Botnet configuration.
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
-pub struct BotnetConfig {
+pub struct BotnetConfig<E, A, C>
+where
+    E: EntityCounter,
+    A: Anonimity + Default,
+    C: RateLimit,
+{
     /// Botnet config version.
     pub version: Version,
 
     /// Botnet config plan.
-    pub plan: Plan,
+    pub plan: Plan<E, A, C>,
 
     /// Botnet config keys.
     pub keys: Vec<Key>,
 
-    /// Database configuration.
+    /// Store configuration.
     pub database: Database,
 }
 
-impl From<PathBuf> for BotnetConfig {
+impl<E, A, C> From<PathBuf> for BotnetConfig<E, A, C>
+where
+    E: EntityCounter + for<'a> Deserialize<'a>,
+    A: Anonimity + for<'a> Deserialize<'a> + Default,
+    C: RateLimit + for<'a> Deserialize<'a>,
+{
     /// Create a new botnet configuration.
     fn from(value: PathBuf) -> Self {
         let mut file = File::open(value).expect("Unable to open file.");
@@ -214,8 +283,45 @@ impl From<PathBuf> for BotnetConfig {
         file.read_to_string(&mut content)
             .expect("Unable to read file.");
 
-        let config: BotnetConfig = serde_yaml::from_str(&content).expect("Bad config.");
+        let config: BotnetConfig<E, A, C> =
+            serde_yaml::from_str(&content).expect("Bad config.");
 
         config
     }
+}
+
+/// Applied anonimity for privacy protection.
+pub trait Anonimity {
+    /// Check if the value is anonymous.
+    fn is_anonymous(&self, x: u64) -> bool;
+
+    /// Check if the anonimity is enabled.
+    fn enabled(&self) -> bool;
+
+    fn class(&self) -> &str;
+}
+
+/// Entity counting mechanism.
+pub trait EntityCounter {
+    /// Count this entity.
+    fn count(&self) -> BotnetResult<u64>;
+
+    /// Check if the entity counting is enabled.
+    fn enabled(&self) -> bool;
+
+    fn class(&self) -> &str;
+}
+
+/// A cliff detection mechanism to prevent abuse.
+pub trait RateLimit {
+    /// Register a hit.
+    fn register(&self) -> BotnetResult<()>;
+
+    /// Check if the cliff has been hit.
+    fn has_hit_cliff(&self) -> BotnetResult<bool>;
+
+    /// Check if the rate limit is enabled.
+    fn enabled(&self) -> bool;
+
+    fn class(&self) -> &str;
 }
